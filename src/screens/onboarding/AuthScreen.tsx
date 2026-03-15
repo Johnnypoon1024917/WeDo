@@ -1,0 +1,217 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { supabase } from '../../lib/supabase';
+import { useAppStore } from '../../store/appStore';
+import type { OnboardingStackParamList } from '../../navigation/OnboardingStack';
+
+type AuthNav = NativeStackNavigationProp<OnboardingStackParamList, 'Auth'>;
+
+export default function AuthScreen() {
+  const navigation = useNavigation<AuthNav>();
+  const setAuth = useAppStore((s) => s.setAuth);
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+  const handleOAuth = async (provider: 'apple' | 'google') => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider });
+      if (error) {
+        Alert.alert('Sign In Error', error.message);
+        return;
+      }
+      // OAuth redirects externally; session is picked up by auth listener
+    } catch (e: any) {
+      Alert.alert('Sign In Error', e.message ?? 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMagicLink = async () => {
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: email.trim() });
+      if (error) {
+        Alert.alert('Magic Link Error', error.message);
+        return;
+      }
+      setMagicLinkSent(true);
+    } catch (e: any) {
+      Alert.alert('Magic Link Error', e.message ?? 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Listen for auth state changes (handles OAuth redirect + magic link)
+  React.useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          // Fetch user's relationship info
+          const { data: userData } = await supabase
+            .from('users')
+            .select('relationship_id')
+            .eq('id', session.user.id)
+            .single();
+
+          let partnerId: string | null = null;
+          const relationshipId = userData?.relationship_id ?? null;
+
+          if (relationshipId) {
+            const { data: rel } = await supabase
+              .from('relationships')
+              .select('user1_id, user2_id')
+              .eq('id', relationshipId)
+              .single();
+            if (rel) {
+              partnerId = rel.user1_id === session.user.id
+                ? rel.user2_id
+                : rel.user1_id;
+            }
+          }
+
+          setAuth(session.user, session, relationshipId, partnerId);
+
+          // If not yet paired, go to PairingGateway
+          if (!relationshipId) {
+            navigation.replace('PairingGateway');
+          }
+          // If paired, RootNavigator will swap to MainTabNavigator automatically
+        }
+      },
+    );
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
+    <KeyboardAvoidingView
+      className="flex-1 bg-charcoal"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View className="flex-1 items-center justify-center px-8">
+        <Text
+          className="text-soft-coral text-4xl font-bold mb-2"
+          style={{ fontFamily: 'serif' }}
+        >
+          WeDo
+        </Text>
+        <Text className="text-gray-400 text-base mb-10">
+          Sign in to start your adventure
+        </Text>
+
+        {/* Apple Sign In */}
+        <TouchableOpacity
+          className="w-full bg-white rounded-xl py-4 mb-3 items-center"
+          onPress={() => handleOAuth('apple')}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in with Apple"
+        >
+          <Text className="text-black text-base font-semibold">
+            Continue with Apple
+          </Text>
+        </TouchableOpacity>
+
+        {/* Google Sign In */}
+        <TouchableOpacity
+          className="w-full bg-white rounded-xl py-4 mb-6 items-center"
+          onPress={() => handleOAuth('google')}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in with Google"
+        >
+          <Text className="text-black text-base font-semibold">
+            Continue with Google
+          </Text>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View className="flex-row items-center w-full mb-6">
+          <View className="flex-1 h-px bg-gray-700" />
+          <Text className="text-gray-500 mx-4 text-sm">or</Text>
+          <View className="flex-1 h-px bg-gray-700" />
+        </View>
+
+        {/* Magic Link */}
+        {magicLinkSent ? (
+          <View className="items-center">
+            <Text className="text-teal text-base font-semibold mb-1">
+              Check your email
+            </Text>
+            <Text className="text-gray-400 text-sm text-center">
+              We sent a magic link to {email}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <TextInput
+              className="w-full bg-gray-800 text-white rounded-xl px-4 py-4 mb-3 text-base"
+              placeholder="Email address"
+              placeholderTextColor="#6b7280"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={email}
+              onChangeText={setEmail}
+              editable={!loading}
+              accessibilityLabel="Email address"
+            />
+            <TouchableOpacity
+              className="w-full bg-soft-coral rounded-xl py-4 items-center"
+              onPress={handleMagicLink}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Send magic link"
+            >
+              {loading ? (
+                <ActivityIndicator color="#121212" />
+              ) : (
+                <Text className="text-charcoal text-base font-semibold">
+                  Send Magic Link
+                </Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* DEV ONLY: Skip to main app */}
+        {__DEV__ && (
+          <TouchableOpacity
+            className="mt-8 py-3 px-6 rounded-lg border border-gray-600"
+            onPress={() => {
+              // Fake user/session to bypass auth + pairing gate
+              setAuth(
+                { id: 'dev-user-1', email: 'dev@test.com' } as any,
+                { access_token: 'dev-token' } as any,
+                'dev-relationship-id',
+                'dev-partner-id',
+              );
+            }}
+          >
+            <Text className="text-gray-500 text-sm text-center">
+              ⚡ Skip to Main (Dev)
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </KeyboardAvoidingView>
+  );
+}

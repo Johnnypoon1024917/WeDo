@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "WeDo",
+    "slug": "wedo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121212"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.wedo"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#121212",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "package": "com.anonymous.wedo",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.SEND",
+          "category": ["android.intent.category.DEFAULT"],
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-local-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "WeDo needs access to your photos to create memories.",
+          "cameraPermission": "WeDo needs access to your camera to take photos."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "WeDo needs access to your microphone to record audio notes."
+        }
+      ],
+      "./plugins/withSocialCatcher",
+      "./plugins/withWidgetBridge"
+    ]
+  }
+}
