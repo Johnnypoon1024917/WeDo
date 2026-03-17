@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,20 +18,55 @@ import LocationSearch, { LocationResult } from '../components/LocationSearch';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddToListModal'>;
 
+const FREE_ITEM_LIMIT = 10;
+
 export default function AddToListModal({ navigation, route }: Props) {
   const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const relationshipId = useAppStore((s) => s.relationshipId);
+  const isPremium = useAppStore((s) => s.isPremium);
 
   const prefilledUrl = route.params?.url ?? '';
 
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState(prefilledUrl);
+  const [checkingLimit, setCheckingLimit] = useState(true);
   const [location, setLocation] = useState<LocationResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit = title.trim().length > 0 && !saving;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkItemLimit() {
+      if (isPremium || !relationshipId) {
+        setCheckingLimit(false);
+        return;
+      }
+
+      const { count, error: countError } = await supabase
+        .from('bucket_list_items')
+        .select('id', { count: 'exact' })
+        .eq('relationship_id', relationshipId);
+
+      if (cancelled) return;
+
+      if (!countError && count !== null && count >= FREE_ITEM_LIMIT) {
+        navigation.replace('PaywallModal');
+        return;
+      }
+
+      setCheckingLimit(false);
+    }
+
+    checkItemLimit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = async () => {
     if (!canSubmit || !user || !relationshipId) return;
@@ -61,6 +96,14 @@ export default function AddToListModal({ navigation, route }: Props) {
 
     navigation.goBack();
   };
+
+  if (checkingLimit) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator color="#FF7F50" size="large" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView

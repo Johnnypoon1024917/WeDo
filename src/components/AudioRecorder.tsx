@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import {
   startRecording as startAudioRecording,
   uploadAudio,
@@ -43,6 +44,13 @@ export default function AudioRecorder({
   const handleStart = useCallback(async () => {
     try {
       setError(null);
+
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Microphone access is required to record voice notes');
+        return;
+      }
+
       setIsRecording(true);
       setDurationMs(0);
 

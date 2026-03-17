@@ -106,15 +106,27 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
             try {
               // Delete photo from storage
               const photoPath = extractStoragePath(item.photo_url);
-              if (photoPath) {
-                await supabase.storage.from('wedo-assets').remove([photoPath]);
+              if (!photoPath) {
+                Alert.alert(t('common.error'), t('timeline.deleteError'));
+                return;
+              }
+              const { error: photoError } = await supabase.storage.from('wedo-assets').remove([photoPath]);
+              if (photoError) {
+                Alert.alert(t('common.error'), t('timeline.deleteError'));
+                return;
               }
 
               // Delete audio from storage if it exists
               if (item.audio_url) {
                 const audioPath = extractStoragePath(item.audio_url);
-                if (audioPath) {
-                  await supabase.storage.from('wedo-assets').remove([audioPath]);
+                if (!audioPath) {
+                  Alert.alert(t('common.error'), t('timeline.deleteError'));
+                  return;
+                }
+                const { error: audioError } = await supabase.storage.from('wedo-assets').remove([audioPath]);
+                if (audioError) {
+                  Alert.alert(t('common.error'), t('timeline.deleteError'));
+                  return;
                 }
               }
 

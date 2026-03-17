@@ -16,6 +16,7 @@ import { useAppStore } from '../store/appStore';
 import { restorePurchases } from '../services/purchaseService';
 import { supabase } from '../lib/supabase';
 import { calculateDaysTogether } from '../services/widgetBridge';
+import { realtimeManager } from '../services/realtimeManager';
 import i18n, { LANGUAGE_KEY } from '../i18n';
 
 const VAULT_ENABLED_KEY = 'wedo_vault_enabled';
@@ -139,6 +140,7 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           setSigningOut(true);
+          realtimeManager.unsubscribeAll();
           await supabase.auth.signOut();
           clearAuth();
           setSigningOut(false);
