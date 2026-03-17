@@ -1,4 +1,5 @@
 import './global.css';
+import './src/i18n';
 import React, { useEffect, useRef } from 'react';
 import {
   NavigationContainer,

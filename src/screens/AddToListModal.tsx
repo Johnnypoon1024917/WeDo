@@ -11,12 +11,14 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddToListModal'>;
 
 export default function AddToListModal({ navigation, route }: Props) {
+  const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const relationshipId = useAppStore((s) => s.relationshipId);
 
@@ -48,7 +50,7 @@ export default function AddToListModal({ navigation, route }: Props) {
     setSaving(false);
 
     if (insertError) {
-      setError('Save failed — please check your connection and try again');
+      setError(t('addToList.saveFailed'));
       return;
     }
 
@@ -65,43 +67,43 @@ export default function AddToListModal({ navigation, route }: Props) {
         <Pressable
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel"
+          accessibilityLabel={t('common.cancel')}
         >
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
         </Pressable>
 
-        <Text style={styles.headerTitle}>New Bucket List Item</Text>
+        <Text style={styles.headerTitle}>{t('addToList.newBucketListItem')}</Text>
 
         <View style={styles.headerSpacer} />
       </View>
 
       {/* Form */}
       <View style={styles.form}>
-        <Text style={styles.label}>Title *</Text>
+        <Text style={styles.label}>{t('addToList.titleLabel')}</Text>
         <TextInput
           style={styles.input}
           value={title}
           onChangeText={setTitle}
-          placeholder="e.g. Sunset picnic at the beach"
+          placeholder={t('addToList.titlePlaceholder')}
           placeholderTextColor="#6B7280"
           autoFocus
           returnKeyType="next"
           maxLength={200}
-          accessibilityLabel="Item title"
+          accessibilityLabel={t('addToList.titleLabel')}
         />
 
-        <Text style={[styles.label, styles.labelSpacing]}>URL (optional)</Text>
+        <Text style={[styles.label, styles.labelSpacing]}>{t('addToList.urlLabel')}</Text>
         <TextInput
           style={styles.input}
           value={url}
           onChangeText={setUrl}
-          placeholder="https://..."
+          placeholder={t('addToList.urlPlaceholder')}
           placeholderTextColor="#6B7280"
           keyboardType="url"
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
-          accessibilityLabel="Item URL"
+          accessibilityLabel={t('addToList.urlLabel')}
         />
 
         {error && (
@@ -116,12 +118,12 @@ export default function AddToListModal({ navigation, route }: Props) {
           onPress={handleSubmit}
           disabled={!canSubmit}
           accessibilityRole="button"
-          accessibilityLabel="Save bucket list item"
+          accessibilityLabel={t('common.save')}
         >
           {saving ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.submitText}>Save</Text>
+            <Text style={styles.submitText}>{t('common.save')}</Text>
           )}
         </Pressable>
       </View>

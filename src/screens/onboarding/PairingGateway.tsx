@@ -16,6 +16,7 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { useAppStore } from '../../store/appStore';
 
@@ -35,6 +36,7 @@ export default function PairingGateway() {
   const user = useAppStore((s) => s.user);
   const setAuth = useAppStore((s) => s.setAuth);
   const session = useAppStore((s) => s.session);
+  const { t } = useTranslation();
 
   const [mode, setMode] = useState<Mode>('choose');
   const [loading, setLoading] = useState(false);
@@ -93,7 +95,7 @@ export default function PairingGateway() {
       setGeneratedCode(code);
       setMode('create');
     } catch (e: any) {
-      setError(e.message ?? 'Something went wrong');
+      setError(e.message ?? t('auth.somethingWentWrong'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +105,7 @@ export default function PairingGateway() {
     if (!user) return;
     const trimmed = joinCode.trim().toUpperCase();
     if (trimmed.length !== 6) {
-      setError('Please enter a 6-character code.');
+      setError(t('pairing.enterCode'));
       return;
     }
 
@@ -120,7 +122,7 @@ export default function PairingGateway() {
         .single();
 
       if (lookupError || !codeRecord) {
-        setError('Invalid code — please ask your partner for a new one.');
+        setError(t('pairing.invalidCode'));
         setLoading(false);
         return;
       }
@@ -138,7 +140,7 @@ export default function PairingGateway() {
         .single();
 
       if (relError || !relationship) {
-        setError(relError?.message ?? 'Failed to create relationship.');
+        setError(relError?.message ?? t('pairing.failedCreateRelationship'));
         setLoading(false);
         return;
       }
@@ -163,7 +165,7 @@ export default function PairingGateway() {
 
       await completePairing(relationship.id, partnerId);
     } catch (e: any) {
-      setError(e.message ?? 'Something went wrong');
+      setError(e.message ?? t('auth.somethingWentWrong'));
     } finally {
       setLoading(false);
     }
@@ -190,10 +192,10 @@ export default function PairingGateway() {
           ))}
         </Animated.View>
         <Text className="text-soft-coral text-3xl font-bold" style={{ fontFamily: 'serif' }}>
-          You're paired!
+          {t('pairing.paired')}
         </Text>
         <Text className="text-teal mt-2 text-base">
-          Your adventure begins now ✨
+          {t('pairing.adventureBegins')}
         </Text>
       </View>
     );
@@ -205,10 +207,10 @@ export default function PairingGateway() {
         className="text-soft-coral text-3xl font-bold mb-2"
         style={{ fontFamily: 'serif' }}
       >
-        Pair with Partner
+        {t('pairing.pairWithPartner')}
       </Text>
       <Text className="text-gray-400 text-base mb-10 text-center">
-        Connect with your partner to start sharing adventures
+        {t('pairing.connectSubtitle')}
       </Text>
 
       {mode === 'choose' && (
@@ -218,13 +220,13 @@ export default function PairingGateway() {
             onPress={handleStartNewAdventure}
             disabled={loading}
             accessibilityRole="button"
-            accessibilityLabel="Start New Adventure"
+            accessibilityLabel={t('pairing.startNewAdventure')}
           >
             {loading ? (
               <ActivityIndicator color="#121212" />
             ) : (
               <Text className="text-charcoal text-base font-semibold">
-                Start New Adventure
+                {t('pairing.startNewAdventure')}
               </Text>
             )}
           </TouchableOpacity>
@@ -234,10 +236,10 @@ export default function PairingGateway() {
             onPress={() => { setMode('join'); setError(''); }}
             disabled={loading}
             accessibilityRole="button"
-            accessibilityLabel="Join Partner"
+            accessibilityLabel={t('pairing.joinPartner')}
           >
             <Text className="text-teal text-base font-semibold">
-              Join Partner
+              {t('pairing.joinPartner')}
             </Text>
           </TouchableOpacity>
         </>
@@ -246,7 +248,7 @@ export default function PairingGateway() {
       {mode === 'create' && (
         <View className="items-center">
           <Text className="text-gray-400 text-sm mb-4 text-center">
-            Share this code with your partner
+            {t('pairing.shareCodePrompt')}
           </Text>
           <Text
             className="text-teal text-4xl font-bold tracking-[8px] mb-6"
@@ -255,14 +257,14 @@ export default function PairingGateway() {
             {generatedCode}
           </Text>
           <Text className="text-gray-500 text-xs text-center">
-            Code expires in 15 minutes
+            {t('pairing.codeExpires')}
           </Text>
           <TouchableOpacity
             className="mt-6"
             onPress={() => { setMode('choose'); setError(''); }}
             accessibilityRole="button"
           >
-            <Text className="text-gray-400 text-sm underline">Go back</Text>
+            <Text className="text-gray-400 text-sm underline">{t('pairing.goBack')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -271,7 +273,7 @@ export default function PairingGateway() {
         <View className="w-full items-center">
           <TextInput
             className="w-full bg-gray-800 text-white text-center rounded-xl px-4 py-4 mb-4 text-2xl tracking-[6px]"
-            placeholder="ABC123"
+            placeholder={t('pairing.codePlaceholder')}
             placeholderTextColor="#6b7280"
             autoCapitalize="characters"
             autoCorrect={false}
@@ -279,7 +281,7 @@ export default function PairingGateway() {
             value={joinCode}
             onChangeText={setJoinCode}
             editable={!loading}
-            accessibilityLabel="Enter pairing code"
+            accessibilityLabel={t('pairing.enterPairingCode')}
           />
           <TouchableOpacity
             className="w-full bg-soft-coral rounded-xl py-4 items-center"
@@ -287,12 +289,12 @@ export default function PairingGateway() {
             disabled={loading || joinCode.trim().length !== 6}
             style={{ opacity: joinCode.trim().length === 6 ? 1 : 0.5 }}
             accessibilityRole="button"
-            accessibilityLabel="Join"
+            accessibilityLabel={t('pairing.join')}
           >
             {loading ? (
               <ActivityIndicator color="#121212" />
             ) : (
-              <Text className="text-charcoal text-base font-semibold">Join</Text>
+              <Text className="text-charcoal text-base font-semibold">{t('pairing.join')}</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -300,7 +302,7 @@ export default function PairingGateway() {
             onPress={() => { setMode('choose'); setError(''); setJoinCode(''); }}
             accessibilityRole="button"
           >
-            <Text className="text-gray-400 text-sm underline">Go back</Text>
+            <Text className="text-gray-400 text-sm underline">{t('pairing.goBack')}</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -86,6 +86,40 @@ CREATE TABLE custom_stickers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- notifications
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  relationship_id UUID NOT NULL REFERENCES relationships(id),
+  recipient_id UUID NOT NULL REFERENCES users(id),
+  sender_id UUID NOT NULL REFERENCES users(id),
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- calendar_notes
+CREATE TABLE calendar_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  relationship_id UUID NOT NULL REFERENCES relationships(id),
+  day DATE NOT NULL,
+  note_text TEXT NOT NULL,
+  created_by UUID NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- calendar_events
+CREATE TABLE calendar_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  relationship_id UUID NOT NULL REFERENCES relationships(id),
+  day DATE NOT NULL,
+  title TEXT NOT NULL,
+  time TEXT,
+  created_by UUID NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- =========================
 -- 2. Helper Function
 -- =========================
@@ -106,6 +140,9 @@ ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bucket_list_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_stickers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_stickers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
 
 -- =========================
 -- 4. RLS Policies
@@ -173,12 +210,50 @@ CREATE POLICY "Anyone can read unused codes by code value"
   ON pairing_codes FOR SELECT
   USING (used = false AND expires_at > now());
 
+-- ---- notifications ----
+CREATE POLICY "Users can read own notifications"
+  ON notifications FOR SELECT
+  USING (
+    relationship_id = get_my_relationship_id()
+    AND recipient_id = auth.uid()
+  );
+
+CREATE POLICY "Users can insert notifications for own relationship"
+  ON notifications FOR INSERT
+  WITH CHECK (
+    relationship_id = get_my_relationship_id()
+    AND sender_id = auth.uid()
+  );
+
+-- ---- calendar_notes ----
+CREATE POLICY "Users can read/write/delete own relationship calendar notes"
+  ON calendar_notes FOR ALL
+  USING (relationship_id = get_my_relationship_id());
+
+-- ---- calendar_events ----
+CREATE POLICY "Users can read/write/delete own relationship calendar events"
+  ON calendar_events FOR ALL
+  USING (relationship_id = get_my_relationship_id());
+
+-- ---- memories (DELETE) ----
+CREATE POLICY "Users can delete own memories"
+  ON memories FOR DELETE
+  USING (
+    relationship_id = get_my_relationship_id()
+    AND created_by = auth.uid()
+  );
+
+-- ---- calendar_stickers (DELETE) ----
+CREATE POLICY "Users can delete own relationship stickers"
+  ON calendar_stickers FOR DELETE
+  USING (relationship_id = get_my_relationship_id());
+
 -- =========================
 -- 5. Supabase Storage Bucket
 -- =========================
 
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('wedo-assets', 'wedo-assets', false);
+VALUES ('wedo-assets', 'wedo-assets', true);
 
 -- Storage policy: read access scoped to relationship_id path prefix
 CREATE POLICY "Relationship members can read assets"
@@ -219,3 +294,25 @@ CREATE POLICY "Relationship members can delete assets"
 ALTER PUBLICATION supabase_realtime ADD TABLE memories;
 ALTER PUBLICATION supabase_realtime ADD TABLE bucket_list_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE calendar_stickers;
+ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE calendar_events;
+ALTER PUBLICATION supabase_realtime ADD TABLE calendar_notes;
+
+-- =========================
+-- 7. Auth Trigger
+-- =========================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, created_at)
+  VALUES (NEW.id, NEW.email, NEW.created_at)
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();

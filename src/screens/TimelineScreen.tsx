@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   LayoutChangeEvent,
@@ -16,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import { realtimeManager, MemoryEntry } from '../services/realtimeManager';
@@ -46,9 +48,18 @@ function dateKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
+/** Extract the storage path from a Supabase public URL. */
+function extractStoragePath(publicUrl: string): string | null {
+  const marker = '/object/public/wedo-assets/';
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return publicUrl.slice(idx + marker.length);
+}
+
 /* ── MemoryCard ──────────────────────────────────────────────── */
 
-function MemoryCard({ item }: { item: MemoryEntry }) {
+function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: string) => void }) {
+  const { t } = useTranslation();
   const currentUserId = useAppStore((s) => s.user?.id);
   const isPremium = useAppStore((s) => s.isPremium);
   const relationshipId = useAppStore((s) => s.relationshipId);
@@ -80,6 +91,45 @@ function MemoryCard({ item }: { item: MemoryEntry }) {
     setShowRecorder(false);
   }, []);
 
+  const handleDelete = useCallback(() => {
+    Alert.alert(
+      t('timeline.deleteMemory'),
+      t('timeline.deleteConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Delete photo from storage
+              const photoPath = extractStoragePath(item.photo_url);
+              if (photoPath) {
+                await supabase.storage.from('wedo-assets').remove([photoPath]);
+              }
+
+              // Delete audio from storage if it exists
+              if (item.audio_url) {
+                const audioPath = extractStoragePath(item.audio_url);
+                if (audioPath) {
+                  await supabase.storage.from('wedo-assets').remove([audioPath]);
+                }
+              }
+
+              // Delete the memory record
+              await supabase.from('memories').delete().eq('id', item.id);
+
+              // Update local state
+              onDelete(item.id);
+            } catch {
+              Alert.alert(t('common.error'), t('timeline.deleteError'));
+            }
+          },
+        },
+      ],
+    );
+  }, [item, onDelete, t]);
+
   return (
     <Animated.View
       entering={FadeInDown.springify().damping(15).stiffness(120)}
@@ -93,6 +143,16 @@ function MemoryCard({ item }: { item: MemoryEntry }) {
             style={styles.photo}
             onLayout={onPhotoLayout}
           />
+          {isCreator && (
+            <Pressable
+              onPress={handleDelete}
+              style={styles.deleteButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('timeline.deleteMemory')}
+            >
+              <Text style={styles.deleteIcon}>🗑️</Text>
+            </Pressable>
+          )}
           {showOverlay && photoLayout.width > 0 && (
             <GestureHandlerRootView style={StyleSheet.absoluteFill}>
               <ScratchOffOverlay
@@ -112,7 +172,7 @@ function MemoryCard({ item }: { item: MemoryEntry }) {
                 onPress={handleMicPress}
                 style={styles.micButton}
                 accessibilityRole="button"
-                accessibilityLabel="Add voice note"
+                accessibilityLabel={t('timeline.addVoiceNote')}
               >
                 <Text style={styles.micIcon}>🎙️</Text>
               </Pressable>
@@ -144,11 +204,12 @@ function DateHeader({ date }: { date: string }) {
 /* ── EmptyState ──────────────────────────────────────────────── */
 
 function EmptyState() {
+  const { t } = useTranslation();
   return (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyEmoji}>📸</Text>
       <Text style={styles.emptyText}>
-        No adventures yet — complete a date from your Bucket List to start!
+        {t('timeline.noAdventures')}
       </Text>
     </View>
   );
@@ -177,6 +238,7 @@ function buildRows(memories: MemoryEntry[]): Row[] {
 /* ── TimelineScreen ──────────────────────────────────────────── */
 
 export default function TimelineScreen() {
+  const { t } = useTranslation();
   const relationshipId = useAppStore((s) => s.relationshipId);
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -244,19 +306,23 @@ export default function TimelineScreen() {
   /* ── render ── */
   const rows = buildRows(memories);
 
+  const handleDeleteMemory = useCallback((id: string) => {
+    setMemories((prev) => prev.filter((m) => m.id !== id));
+  }, []);
+
   const renderItem = useCallback(({ item }: { item: Row }) => {
     if (item.type === 'header') {
       return <DateHeader date={item.date} />;
     }
-    return <MemoryCard item={item.data} />;
-  }, []);
+    return <MemoryCard item={item.data} onDelete={handleDeleteMemory} />;
+  }, [handleDeleteMemory]);
 
   const keyExtractor = useCallback((item: Row) => item.key, []);
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading…</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -324,6 +390,21 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     position: 'relative',
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  deleteIcon: {
+    fontSize: 16,
   },
   cardBody: {
     padding: 14,

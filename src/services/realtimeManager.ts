@@ -36,10 +36,21 @@ export interface BucketListItem {
   created_at: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  relationship_id: string;
+  day: string;
+  title: string;
+  time: string | null;
+  created_by: string;
+  created_at: string;
+}
+
 // Track last-seen timestamps for reconciliation after reconnect
 let lastMemoryTimestamp: string | null = null;
 let lastStickerTimestamp: string | null = null;
 let lastBucketTimestamp: string | null = null;
+let lastCalendarEventTimestamp: string | null = null;
 
 // Active channels for cleanup
 const activeChannels: RealtimeChannel[] = [];
@@ -125,6 +136,29 @@ async function reconcileBucketList(
       onInsert(item);
       if (item.created_at > (lastBucketTimestamp ?? '')) {
         lastBucketTimestamp = item.created_at;
+      }
+    }
+  }
+}
+
+async function reconcileCalendarEvents(
+  relationshipId: string,
+  onInsert: (event: CalendarEvent) => void
+) {
+  if (!lastCalendarEventTimestamp) return;
+
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .eq('relationship_id', relationshipId)
+    .gt('created_at', lastCalendarEventTimestamp)
+    .order('created_at', { ascending: true });
+
+  if (!error && data) {
+    for (const event of data as CalendarEvent[]) {
+      onInsert(event);
+      if (event.created_at > (lastCalendarEventTimestamp ?? '')) {
+        lastCalendarEventTimestamp = event.created_at;
       }
     }
   }
@@ -252,6 +286,51 @@ export const realtimeManager = {
     return channel;
   },
 
+  subscribeToCalendarEvents(
+    relationshipId: string,
+    onInsert: (event: CalendarEvent) => void,
+    onDelete: (event: CalendarEvent) => void
+  ): RealtimeChannel {
+    const channel = supabase
+      .channel(`calendar_events:${relationshipId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'calendar_events',
+          filter: `relationship_id=eq.${relationshipId}`,
+        },
+        (payload) => {
+          const event = payload.new as CalendarEvent;
+          lastCalendarEventTimestamp = event.created_at;
+          onInsert(event);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'calendar_events',
+          filter: `relationship_id=eq.${relationshipId}`,
+        },
+        (payload) => {
+          const event = payload.old as CalendarEvent;
+          onDelete(event);
+        }
+      )
+      .subscribe(async (status) => {
+        handleChannelStatus(status);
+        if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
+          await reconcileCalendarEvents(relationshipId, onInsert);
+        }
+      });
+
+    activeChannels.push(channel);
+    return channel;
+  },
+
   unsubscribeAll(): void {
     for (const channel of activeChannels) {
       supabase.removeChannel(channel);
@@ -260,6 +339,7 @@ export const realtimeManager = {
     lastMemoryTimestamp = null;
     lastStickerTimestamp = null;
     lastBucketTimestamp = null;
+    lastCalendarEventTimestamp = null;
     useAppStore.getState().setConnectionStatus('disconnected');
   },
 };

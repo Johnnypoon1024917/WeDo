@@ -31,7 +31,9 @@
       "intentFilters": [
         {
           "action": "android.intent.action.SEND",
-          "category": ["android.intent.category.DEFAULT"],
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
           "data": [
             {
               "mimeType": "text/plain"
@@ -59,7 +61,8 @@
         }
       ],
       "./plugins/withSocialCatcher",
-      "./plugins/withWidgetBridge"
+      "./plugins/withWidgetBridge",
+      "expo-localization"
     ]
   }
 }

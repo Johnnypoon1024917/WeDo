@@ -10,6 +10,7 @@ import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import {
@@ -26,10 +27,13 @@ const FREE_ITEM_LIMIT = 10;
 function BucketListRow({
   item,
   onToggleComplete,
+  onDelete,
 }: {
   item: BucketListItem;
   onToggleComplete: (item: BucketListItem) => void;
+  onDelete: (item: BucketListItem) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Animated.View
       entering={FadeInDown.springify().damping(15).stiffness(120)}
@@ -41,7 +45,7 @@ function BucketListRow({
           onPress={() => onToggleComplete(item)}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: item.completed }}
-          accessibilityLabel={`Mark ${item.title} as ${item.completed ? 'incomplete' : 'complete'}`}
+          accessibilityLabel={t('bucketList.markItem', { title: item.title, state: item.completed ? t('bucketList.incomplete') : t('bucketList.complete') })}
         >
           <Text style={styles.checkboxIcon}>
             {item.completed ? '✅' : '⬜'}
@@ -64,6 +68,15 @@ function BucketListRow({
             </Text>
           ) : null}
         </View>
+
+        <Pressable
+          style={styles.deleteButton}
+          onPress={() => onDelete(item)}
+          accessibilityRole="button"
+          accessibilityLabel={t('bucketList.deleteItem', { title: item.title })}
+        >
+          <Text style={styles.deleteIcon}>🗑️</Text>
+        </Pressable>
       </BlurView>
     </Animated.View>
   );
@@ -72,11 +85,12 @@ function BucketListRow({
 /* ── EmptyState ──────────────────────────────────────────────── */
 
 function EmptyState() {
+  const { t } = useTranslation();
   return (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyEmoji}>📝</Text>
       <Text style={styles.emptyText}>
-        No bucket list items yet — tap the + button to add your first date idea!
+        {t('bucketList.noBucketItems')}
       </Text>
     </View>
   );
@@ -85,6 +99,7 @@ function EmptyState() {
 /* ── BucketListScreen ────────────────────────────────────────── */
 
 export default function BucketListScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const relationshipId = useAppStore((s) => s.relationshipId);
   const isPremium = useAppStore((s) => s.isPremium);
@@ -189,12 +204,31 @@ export default function BucketListScreen() {
     [],
   );
 
+  /* ── delete item ── */
+  const handleDeleteItem = useCallback(
+    async (item: BucketListItem) => {
+      const { error } = await supabase
+        .from('bucket_list_items')
+        .delete()
+        .eq('id', item.id);
+
+      if (!error) {
+        setItems((prev) => prev.filter((i) => i.id !== item.id));
+      }
+    },
+    [],
+  );
+
   /* ── render ── */
   const renderItem = useCallback(
     ({ item }: { item: BucketListItem }) => (
-      <BucketListRow item={item} onToggleComplete={handleToggleComplete} />
+      <BucketListRow
+        item={item}
+        onToggleComplete={handleToggleComplete}
+        onDelete={handleDeleteItem}
+      />
     ),
-    [handleToggleComplete],
+    [handleToggleComplete, handleDeleteItem],
   );
 
   const keyExtractor = useCallback((item: BucketListItem) => item.id, []);
@@ -202,7 +236,7 @@ export default function BucketListScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading…</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -211,14 +245,14 @@ export default function BucketListScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Bucket List</Text>
+        <Text style={styles.headerTitle}>{t('bucketList.bucketList')}</Text>
         <Pressable
           onPress={() => {
             navigation.navigate('WheelScreen');
           }}
           style={styles.wheelButton}
           accessibilityRole="button"
-          accessibilityLabel="Open Indecision Wheel"
+          accessibilityLabel={t('bucketList.openWheel')}
         >
           <Text style={styles.wheelIcon}>🎡</Text>
         </Pressable>
@@ -227,7 +261,7 @@ export default function BucketListScreen() {
       {/* Item count for free users */}
       {!isPremium && (
         <Text style={styles.itemCount}>
-          {items.length}/{FREE_ITEM_LIMIT} items
+          {t('bucketList.itemCount', { count: items.length, limit: FREE_ITEM_LIMIT })}
         </Text>
       )}
 
@@ -247,7 +281,7 @@ export default function BucketListScreen() {
         style={styles.fab}
         onPress={handleAddPress}
         accessibilityRole="button"
-        accessibilityLabel="Add bucket list item"
+        accessibilityLabel={t('bucketList.addItem')}
       >
         <Text style={styles.fabIcon}>+</Text>
       </Pressable>
@@ -333,6 +367,13 @@ const styles = StyleSheet.create({
   },
   rowContent: {
     flex: 1,
+  },
+  deleteButton: {
+    marginLeft: 12,
+    padding: 6,
+  },
+  deleteIcon: {
+    fontSize: 18,
   },
   itemTitle: {
     fontSize: 16,

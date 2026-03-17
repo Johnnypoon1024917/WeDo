@@ -8,6 +8,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { PurchasesPackage } from 'react-native-purchases';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/appStore';
 import {
   getLifetimePackage,
@@ -18,6 +19,7 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'PaywallModal'>;
 
 export default function PaywallModal({ navigation }: Props) {
+  const { t } = useTranslation();
   const isPremium = useAppStore((s) => s.isPremium);
   const [pkg, setPkg] = useState<PurchasesPackage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,27 +73,27 @@ export default function PaywallModal({ navigation }: Props) {
           onPress={() => navigation.goBack()}
           className="self-end mb-4"
           accessibilityRole="button"
-          accessibilityLabel="Close paywall"
+          accessibilityLabel={t('paywall.close')}
         >
-          <Text className="text-gray-400 text-base">Close</Text>
+          <Text className="text-gray-400 text-base">{t('paywall.close')}</Text>
         </Pressable>
 
         <Text className="text-white text-3xl font-bold text-center mt-4">
-          Unlock WeDo Premium
+          {t('paywall.unlockPremium')}
         </Text>
         <Text className="text-gray-400 text-base text-center mt-3 leading-6">
-          One purchase. Lifetime access. No subscriptions.
+          {t('paywall.subtitle')}
         </Text>
       </View>
 
       {/* Feature list */}
       <View className="mt-8 gap-4">
         {[
-          'Unlimited Bucket List items',
-          'Audio voice notes on memories',
-          'Deep Connection conversation deck',
-          'Custom photo stickers',
-          'Premium widget themes',
+          t('paywall.featureUnlimitedBucketList'),
+          t('paywall.featureAudioNotes'),
+          t('paywall.featureConnectionDeck'),
+          t('paywall.featureCustomStickers'),
+          t('paywall.featurePremiumThemes'),
         ].map((feature) => (
           <View key={feature} className="flex-row items-center gap-3">
             <Text className="text-teal text-lg">✓</Text>
@@ -117,13 +119,13 @@ export default function PaywallModal({ navigation }: Props) {
               disabled={purchasing || !pkg}
               className="bg-soft-coral rounded-2xl py-4 items-center"
               accessibilityRole="button"
-              accessibilityLabel={`Purchase premium for ${priceLabel}`}
+              accessibilityLabel={t('paywall.getPremium', { price: priceLabel })}
             >
               {purchasing ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text className="text-white text-lg font-bold">
-                  Get Premium — {priceLabel}
+                  {t('paywall.getPremium', { price: priceLabel })}
                 </Text>
               )}
             </Pressable>
@@ -133,13 +135,13 @@ export default function PaywallModal({ navigation }: Props) {
               disabled={restoring}
               className="mt-4 items-center py-2"
               accessibilityRole="button"
-              accessibilityLabel="Restore previous purchases"
+              accessibilityLabel={t('settings.restorePurchases')}
             >
               {restoring ? (
                 <ActivityIndicator color="#40E0D0" size="small" />
               ) : (
                 <Text className="text-teal text-sm">
-                  Restore Purchases
+                  {t('settings.restorePurchases')}
                 </Text>
               )}
             </Pressable>

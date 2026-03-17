@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { useAppStore } from '../../store/appStore';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingStack';
@@ -19,6 +20,7 @@ type AuthNav = NativeStackNavigationProp<OnboardingStackParamList, 'Auth'>;
 
 export default function AuthScreen() {
   const navigation = useNavigation<AuthNav>();
+  const { t } = useTranslation();
   const setAuth = useAppStore((s) => s.setAuth);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,12 +31,12 @@ export default function AuthScreen() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({ provider });
       if (error) {
-        Alert.alert('Sign In Error', error.message);
+        Alert.alert(t('auth.signInError'), error.message);
         return;
       }
       // OAuth redirects externally; session is picked up by auth listener
     } catch (e: any) {
-      Alert.alert('Sign In Error', e.message ?? 'Something went wrong');
+      Alert.alert(t('auth.signInError'), e.message ?? t('auth.somethingWentWrong'));
     } finally {
       setLoading(false);
     }
@@ -42,19 +44,19 @@ export default function AuthScreen() {
 
   const handleMagicLink = async () => {
     if (!email.trim()) {
-      Alert.alert('Email Required', 'Please enter your email address.');
+      Alert.alert(t('auth.emailRequired'), t('auth.enterEmail'));
       return;
     }
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({ email: email.trim() });
       if (error) {
-        Alert.alert('Magic Link Error', error.message);
+        Alert.alert(t('auth.magicLinkError'), error.message);
         return;
       }
       setMagicLinkSent(true);
     } catch (e: any) {
-      Alert.alert('Magic Link Error', e.message ?? 'Something went wrong');
+      Alert.alert(t('auth.magicLinkError'), e.message ?? t('auth.somethingWentWrong'));
     } finally {
       setLoading(false);
     }
@@ -114,7 +116,7 @@ export default function AuthScreen() {
           WeDo
         </Text>
         <Text className="text-gray-400 text-base mb-10">
-          Sign in to start your adventure
+          {t('auth.subtitle')}
         </Text>
 
         {/* Apple Sign In */}
@@ -123,10 +125,10 @@ export default function AuthScreen() {
           onPress={() => handleOAuth('apple')}
           disabled={loading}
           accessibilityRole="button"
-          accessibilityLabel="Sign in with Apple"
+          accessibilityLabel={t('auth.continueWithApple')}
         >
           <Text className="text-black text-base font-semibold">
-            Continue with Apple
+            {t('auth.continueWithApple')}
           </Text>
         </TouchableOpacity>
 
@@ -136,17 +138,17 @@ export default function AuthScreen() {
           onPress={() => handleOAuth('google')}
           disabled={loading}
           accessibilityRole="button"
-          accessibilityLabel="Sign in with Google"
+          accessibilityLabel={t('auth.continueWithGoogle')}
         >
           <Text className="text-black text-base font-semibold">
-            Continue with Google
+            {t('auth.continueWithGoogle')}
           </Text>
         </TouchableOpacity>
 
         {/* Divider */}
         <View className="flex-row items-center w-full mb-6">
           <View className="flex-1 h-px bg-gray-700" />
-          <Text className="text-gray-500 mx-4 text-sm">or</Text>
+          <Text className="text-gray-500 mx-4 text-sm">{t('auth.or')}</Text>
           <View className="flex-1 h-px bg-gray-700" />
         </View>
 
@@ -154,17 +156,17 @@ export default function AuthScreen() {
         {magicLinkSent ? (
           <View className="items-center">
             <Text className="text-teal text-base font-semibold mb-1">
-              Check your email
+              {t('auth.checkYourEmail')}
             </Text>
             <Text className="text-gray-400 text-sm text-center">
-              We sent a magic link to {email}
+              {t('auth.magicLinkSent', { email })}
             </Text>
           </View>
         ) : (
           <>
             <TextInput
               className="w-full bg-gray-800 text-white rounded-xl px-4 py-4 mb-3 text-base"
-              placeholder="Email address"
+              placeholder={t('auth.emailPlaceholder')}
               placeholderTextColor="#6b7280"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -172,20 +174,20 @@ export default function AuthScreen() {
               value={email}
               onChangeText={setEmail}
               editable={!loading}
-              accessibilityLabel="Email address"
+              accessibilityLabel={t('auth.emailPlaceholder')}
             />
             <TouchableOpacity
               className="w-full bg-soft-coral rounded-xl py-4 items-center"
               onPress={handleMagicLink}
               disabled={loading}
               accessibilityRole="button"
-              accessibilityLabel="Send magic link"
+              accessibilityLabel={t('auth.sendMagicLink')}
             >
               {loading ? (
                 <ActivityIndicator color="#121212" />
               ) : (
                 <Text className="text-charcoal text-base font-semibold">
-                  Send Magic Link
+                  {t('auth.sendMagicLink')}
                 </Text>
               )}
             </TouchableOpacity>

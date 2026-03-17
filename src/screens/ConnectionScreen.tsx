@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -39,6 +41,9 @@ const CARD_WIDTH = SCREEN_WIDTH - 48;
 const CARD_HEIGHT = 340;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
+const STORAGE_KEY_DECK = 'wedo_connection_deck';
+const STORAGE_KEY_INDEX = 'wedo_connection_index';
+
 function shuffleDeck<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -57,6 +62,7 @@ function ConversationCard({
   isFlipped: boolean;
   onFlip: () => void;
 }) {
+  const { t } = useTranslation();
   const flipProgress = useSharedValue(0);
 
   React.useEffect(() => {
@@ -86,14 +92,14 @@ function ConversationCard({
     <Pressable
       onPress={onFlip}
       accessibilityRole="button"
-      accessibilityLabel={isFlipped ? prompt.prompt : `${prompt.category} card. Tap to reveal`}
+      accessibilityLabel={isFlipped ? prompt.prompt : `${prompt.category} card. ${t('connection.tapToReveal')}`}
     >
       <View style={styles.cardContainer}>
         {/* Front face */}
         <Animated.View style={[styles.card, styles.cardFront, frontStyle]}>
           <Text style={styles.categoryEmoji}>💬</Text>
           <Text style={styles.categoryText}>{prompt.category}</Text>
-          <Text style={styles.tapHint}>Tap to reveal</Text>
+          <Text style={styles.tapHint}>{t('connection.tapToReveal')}</Text>
         </Animated.View>
 
         {/* Back face */}
@@ -107,20 +113,21 @@ function ConversationCard({
 }
 
 function LockedCard({ onPress }: { onPress: () => void }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Locked card. Tap to unlock with premium"
+      accessibilityLabel={t('connection.lockedCard')}
     >
       <View style={[styles.card, styles.lockedCard]}>
         <Text style={styles.lockIcon}>🔒</Text>
-        <Text style={styles.lockedTitle}>Premium Only</Text>
+        <Text style={styles.lockedTitle}>{t('connection.premiumRequired')}</Text>
         <Text style={styles.lockedSubtitle}>
-          Unlock 300+ conversation starters
+          {t('connection.unlockPrompts')}
         </Text>
         <View style={styles.unlockButton}>
-          <Text style={styles.unlockButtonText}>Unlock Now</Text>
+          <Text style={styles.unlockButtonText}>{t('connection.unlockNow')}</Text>
         </View>
       </View>
     </Pressable>
@@ -136,6 +143,7 @@ function SwipeableCard({
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
 }) {
+  const { t } = useTranslation();
   const translateX = useSharedValue(0);
   const [isFlipped, setIsFlipped] = useState(false);
 
@@ -219,7 +227,7 @@ function SwipeableCard({
         <Animated.View style={[styles.card, styles.cardFront, frontStyle]}>
           <Text style={styles.categoryEmoji}>💬</Text>
           <Text style={styles.categoryText}>{prompt.category}</Text>
-          <Text style={styles.tapHint}>Tap to reveal</Text>
+          <Text style={styles.tapHint}>{t('connection.tapToReveal')}</Text>
         </Animated.View>
 
         {/* Back face */}
@@ -233,20 +241,67 @@ function SwipeableCard({
 }
 
 export default function ConnectionScreen() {
+  const { t } = useTranslation();
   const isPremium = useAppStore((s) => s.isPremium);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [deck, setDeck] = useState<Prompt[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const isInitialLoad = useRef(true);
 
   useFocusEffect(
     useCallback(() => {
-      const shuffled = shuffleDeck(prompts as Prompt[]);
-      setDeck(shuffled);
-      setCurrentIndex(0);
-      setIsFlipped(false);
+      let cancelled = false;
+
+      const loadDeck = async () => {
+        try {
+          const [savedDeck, savedIndex] = await Promise.all([
+            AsyncStorage.getItem(STORAGE_KEY_DECK),
+            AsyncStorage.getItem(STORAGE_KEY_INDEX),
+          ]);
+
+          if (cancelled) return;
+
+          if (savedDeck) {
+            // 11.1.2: Restore saved deck and index
+            const parsed = JSON.parse(savedDeck) as Prompt[];
+            setDeck(parsed);
+            setCurrentIndex(savedIndex ? parseInt(savedIndex, 10) : 0);
+          } else {
+            // 11.1.4: No saved state — shuffle and persist
+            const shuffled = shuffleDeck(prompts as Prompt[]);
+            setDeck(shuffled);
+            setCurrentIndex(0);
+            await AsyncStorage.setItem(STORAGE_KEY_DECK, JSON.stringify(shuffled));
+            await AsyncStorage.setItem(STORAGE_KEY_INDEX, '0');
+          }
+        } catch {
+          // Fallback: shuffle without persistence
+          if (!cancelled) {
+            const shuffled = shuffleDeck(prompts as Prompt[]);
+            setDeck(shuffled);
+            setCurrentIndex(0);
+          }
+        }
+        if (!cancelled) {
+          setIsFlipped(false);
+          isInitialLoad.current = false;
+        }
+      };
+
+      loadDeck();
+
+      return () => {
+        cancelled = true;
+      };
     }, [])
   );
+
+  // 11.1.3: Persist index on every change (skip the initial load)
+  useEffect(() => {
+    if (isInitialLoad.current) return;
+    AsyncStorage.setItem(STORAGE_KEY_INDEX, String(currentIndex)).catch(() => {});
+  }, [currentIndex]);
 
   const handlePaywall = useCallback(() => {
     navigation.getParent()?.navigate('PaywallModal');
@@ -263,7 +318,7 @@ export default function ConnectionScreen() {
   if (deck.length === 0) {
     return (
       <View className="flex-1 items-center justify-center bg-charcoal">
-        <Text className="text-gray-400 text-base">Loading...</Text>
+        <Text className="text-gray-400 text-base">{t('common.loading')}</Text>
       </View>
     );
   }
@@ -275,9 +330,9 @@ export default function ConnectionScreen() {
       <View className="flex-1 bg-charcoal" style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text className="text-white text-2xl font-bold">Connection</Text>
+          <Text className="text-white text-2xl font-bold">{t('connection.connection')}</Text>
           <Text className="text-gray-400 text-sm mt-1">
-            Deepen your bond, one question at a time
+            {t('connection.subtitle')}
           </Text>
         </View>
 
@@ -296,7 +351,7 @@ export default function ConnectionScreen() {
                 {currentIndex + 1} / {deck.length}
               </Text>
               <Text className="text-gray-400 text-xs mt-1 text-center">
-                Swipe left/right to navigate · Tap to flip
+                {t('connection.swipeHint')}
               </Text>
             </>
           ) : (

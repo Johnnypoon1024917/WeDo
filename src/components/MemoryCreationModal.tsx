@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import { compress } from '../services/imageCompressor';
@@ -28,6 +29,7 @@ export default function MemoryCreationModal({
   visible,
   onClose,
 }: MemoryCreationModalProps) {
+  const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const relationshipId = useAppStore((s) => s.relationshipId);
 
@@ -53,7 +55,7 @@ export default function MemoryCreationModal({
   const pickFromCamera = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission needed', 'Camera access is required to take a photo.');
+      Alert.alert(t('memoryCreation.permissionNeeded'), t('memoryCreation.cameraAccessRequired'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -67,10 +69,10 @@ export default function MemoryCreationModal({
   };
 
   const showPhotoPicker = () => {
-    Alert.alert('Add Photo', 'Choose a source', [
-      { text: 'Camera', onPress: pickFromCamera },
-      { text: 'Gallery', onPress: pickFromGallery },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('memoryCreation.addPhoto'), t('memoryCreation.chooseSource'), [
+      { text: t('memoryCreation.camera'), onPress: pickFromCamera },
+      { text: t('memoryCreation.gallery'), onPress: pickFromGallery },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -128,7 +130,7 @@ export default function MemoryCreationModal({
       // 6. Success — reset and close
       resetAndClose();
     } catch (err: any) {
-      setError('Upload failed — please check your connection and try again');
+      setError(t('memoryCreation.uploadFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -159,9 +161,9 @@ export default function MemoryCreationModal({
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={resetAndClose} hitSlop={12}>
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={styles.cancelText}>{t('common.cancel')}</Text>
           </Pressable>
-          <Text style={styles.title}>New Memory</Text>
+          <Text style={styles.title}>{t('memoryCreation.newMemory')}</Text>
           <View style={{ width: 60 }} />
         </View>
 
@@ -172,7 +174,7 @@ export default function MemoryCreationModal({
           ) : (
             <View style={styles.photoPlaceholder}>
               <Text style={styles.photoPlaceholderIcon}>📷</Text>
-              <Text style={styles.photoPlaceholderText}>Tap to add a photo</Text>
+              <Text style={styles.photoPlaceholderText}>{t('memoryCreation.tapToAddPhoto')}</Text>
             </View>
           )}
         </Pressable>
@@ -181,7 +183,7 @@ export default function MemoryCreationModal({
         <View style={styles.captionContainer}>
           <TextInput
             style={styles.captionInput}
-            placeholder="Write a caption…"
+            placeholder={t('memoryCreation.captionPlaceholder')}
             placeholderTextColor="#6B7280"
             value={caption}
             onChangeText={setCaption}
@@ -205,7 +207,7 @@ export default function MemoryCreationModal({
           {submitting ? (
             <ActivityIndicator color="#FFF" />
           ) : (
-            <Text style={styles.submitText}>Create Memory</Text>
+            <Text style={styles.submitText}>{t('memoryCreation.createMemory')}</Text>
           )}
         </Pressable>
       </KeyboardAvoidingView>
