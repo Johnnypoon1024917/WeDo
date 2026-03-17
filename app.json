@@ -46,6 +46,12 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "WeDo needs access to your calendar to save important dates."
+        }
+      ],
       "expo-local-authentication",
       [
         "expo-image-picker",
@@ -64,11 +70,8 @@
       [
         "react-native-widget-extension",
         {
-          "widgetName": "WeDoDaysWidget",
-          "targetName": "WeDoDaysWidget",
-          "bundleIdentifier": "com.anonymous.wedo.WeDoDaysWidget",
-          "widgetDir": "targets/widget",
-          "appGroups": ["group.com.wedo.app"],
+          "widgetsFolder": "targets/widget",
+          "groupIdentifier": "group.com.wedo.app",
           "deploymentTarget": "16.0"
         }
       ],

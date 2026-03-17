@@ -199,12 +199,12 @@ export default function AuthScreen() {
           <TouchableOpacity
             className="mt-8 py-3 px-6 rounded-lg border border-gray-600"
             onPress={() => {
-              // Fake user/session to bypass auth + pairing gate
+              // Fake user/session to bypass auth + pairing gate (valid UUIDs)
               setAuth(
-                { id: 'dev-user-1', email: 'dev@test.com' } as any,
+                { id: '00000000-0000-0000-0000-000000000001', email: 'dev@test.com' } as any,
                 { access_token: 'dev-token' } as any,
-                'dev-relationship-id',
-                'dev-partner-id',
+                '00000000-0000-0000-0000-000000000010',
+                '00000000-0000-0000-0000-000000000002',
               );
             }}
           >

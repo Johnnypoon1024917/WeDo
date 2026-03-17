@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "echo '// empty - avoids duplicate ReactNativeWidgetExtensionModule' > node_modules/react-native-widget-extension/ios/Module.swift"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

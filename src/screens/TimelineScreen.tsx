@@ -158,7 +158,8 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
             source={{ uri: item.photo_url }}
             style={styles.photo}
             onLayout={onPhotoLayout}
-            {...{ sharedTransitionTag: `memory-photo-${item.id}` } as any}
+            // @ts-expect-error sharedTransitionTag not in reanimated types yet
+            sharedTransitionTag={`memory-photo-${item.id}`}
           />
           {isCreator && (
             <Pressable

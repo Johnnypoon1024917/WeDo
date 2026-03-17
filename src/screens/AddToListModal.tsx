@@ -90,6 +90,7 @@ export default function AddToListModal({ navigation, route }: Props) {
     setSaving(false);
 
     if (insertError) {
+      console.error('[AddToListModal] Insert failed:', insertError.message, insertError.code, insertError.details);
       setError(t('addToList.saveFailed'));
       return;
     }

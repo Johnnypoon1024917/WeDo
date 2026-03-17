@@ -55,7 +55,7 @@ export default function RootNavigator() {
       <Stack.Screen
         name="MemoryDetailScreen"
         component={MemoryDetailScreen}
-        options={{ headerShown: false, presentation: 'transparentModal' }}
+        options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }}
       />
       <Stack.Screen
         name="YearInReviewModal"

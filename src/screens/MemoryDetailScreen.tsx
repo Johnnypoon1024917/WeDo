@@ -58,7 +58,8 @@ export default function MemoryDetailScreen({ navigation, route }: Props) {
             source={{ uri: memory.photo_url }}
             style={styles.photo}
             resizeMode="cover"
-            {...{ sharedTransitionTag: `memory-photo-${memory.id}` } as any}
+            // @ts-expect-error sharedTransitionTag not in reanimated types yet
+            sharedTransitionTag={`memory-photo-${memory.id}`}
           />
         </View>
 
