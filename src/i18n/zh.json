@@ -32,7 +32,10 @@
     "eventTimePlaceholder": "时间（可选，例如 7:00 PM）",
     "eventTitle": "事件 — {{day}}",
     "failedSaveEvent": "保存事件失败 — 请重试。",
-    "noEvents": "这一天没有事件"
+    "noEvents": "这一天没有事件",
+    "syncToDeviceCalendar": "同步到设备日历",
+    "permissionDenied": "需要日历权限才能将事件同步到设备日历。事件已仅保存到 WeDo。",
+    "syncFailed": "事件已保存，但设备日历同步失败。请稍后重试。"
   },
   "bucketList": {
     "bucketList": "心愿清单",
@@ -53,7 +56,10 @@
     "unlockNow": "立即解锁",
     "tapToReveal": "点击揭晓",
     "swipeHint": "左右滑动浏览 · 点击翻转",
-    "lockedCard": "已锁定的卡片。点击使用高级版解锁"
+    "lockedCard": "已锁定的卡片。点击使用高级版解锁",
+    "dailyQuestion": "每日问题",
+    "markDiscussed": "标记为已讨论",
+    "discussed": "已讨论 ✓"
   },
   "memoryCreation": {
     "permissionNeeded": "需要权限",
@@ -74,7 +80,8 @@
     "titlePlaceholder": "例如：海边日落野餐",
     "urlLabel": "链接（可选）",
     "urlPlaceholder": "https://...",
-    "saveFailed": "保存失败 — 请检查网络连接后重试"
+    "saveFailed": "保存失败 — 请检查网络连接后重试",
+    "locationLabel": "位置（可选）"
   },
   "paywall": {
     "close": "关闭",

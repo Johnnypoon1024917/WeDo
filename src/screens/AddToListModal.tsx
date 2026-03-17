@@ -14,6 +14,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
+import LocationSearch, { LocationResult } from '../components/LocationSearch';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddToListModal'>;
 
@@ -26,6 +27,7 @@ export default function AddToListModal({ navigation, route }: Props) {
 
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState(prefilledUrl);
+  const [location, setLocation] = useState<LocationResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +47,9 @@ export default function AddToListModal({ navigation, route }: Props) {
         url: url.trim() || null,
         completed: false,
         created_by: user.id,
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
+        place_name: location?.place_name ?? null,
       });
 
     setSaving(false);
@@ -105,6 +110,9 @@ export default function AddToListModal({ navigation, route }: Props) {
           returnKeyType="done"
           accessibilityLabel={t('addToList.urlLabel')}
         />
+
+        <Text style={[styles.label, styles.labelSpacing]}>{t('addToList.locationLabel')}</Text>
+        <LocationSearch onLocationSelect={setLocation} />
 
         {error && (
           <Text style={styles.errorText}>{error}</Text>

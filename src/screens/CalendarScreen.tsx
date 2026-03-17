@@ -9,7 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Calendar, DateData } from 'react-native-calendars';
+import { CalendarList, DateData } from 'react-native-calendars';
+import type { CalendarListImperativeMethods } from 'react-native-calendars/src/calendar-list';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,7 @@ import { DEFAULT_STICKERS } from '../assets/stickers/stickerData';
 import StickerDrawer from '../components/StickerDrawer';
 import DayNoteModal from '../components/DayNoteModal';
 import AddEventModal from '../components/AddEventModal';
+import MonthYearPicker from '../components/MonthYearPicker';
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -45,6 +47,17 @@ export default function CalendarScreen() {
   const [stickers, setStickers] = useState<CalendarSticker[]>([]);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(todayString());
+
+  // Month/Year picker state
+  const [pickerVisible, setPickerVisible] = useState(false);
+  /** Display label for the header, e.g. "June 2025" */
+  const [headerMonth, setHeaderMonth] = useState(() => {
+    const d = new Date();
+    return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+  });
+
+  // CalendarList ref for programmatic scrolling
+  const calendarListRef = useRef<CalendarListImperativeMethods>(null);
 
   // Day note modal state
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -351,21 +364,68 @@ export default function CalendarScreen() {
 
   const onMonthChange = useCallback((month: DateData) => {
     setCurrentMonth(month.dateString);
+    // Update header label
+    const d = new Date(month.year, month.month - 1);
+    setHeaderMonth(d.toLocaleString('default', { month: 'long', year: 'numeric' }));
     // Clear cached layouts since cells will re-render
     dayCellLayouts.current.clear();
+  }, []);
+
+  /** Called by CalendarList when visible months change during scroll */
+  const onVisibleMonthsChange = useCallback((months: DateData[]) => {
+    if (months && months.length > 0) {
+      const first = months[0];
+      setCurrentMonth(first.dateString);
+      const d = new Date(first.year, first.month - 1);
+      setHeaderMonth(d.toLocaleString('default', { month: 'long', year: 'numeric' }));
+      dayCellLayouts.current.clear();
+    }
+  }, []);
+
+  /** User confirmed a month/year in the picker */
+  const handlePickerSelect = useCallback((month: number, year: number) => {
+    setPickerVisible(false);
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+    setCurrentMonth(dateStr);
+    const d = new Date(year, month - 1);
+    setHeaderMonth(d.toLocaleString('default', { month: 'long', year: 'numeric' }));
+    calendarListRef.current?.scrollToMonth(dateStr);
+    dayCellLayouts.current.clear();
+  }, []);
+
+  const handlePickerDismiss = useCallback(() => {
+    setPickerVisible(false);
   }, []);
 
   return (
     <GestureHandlerRootView style={styles.root}>
       <View style={styles.container} ref={calendarRef}>
-        <Calendar
-          key={currentMonth.slice(0, 7)}
+        {/* ── Pressable month/year header ── */}
+        <Pressable
+          onPress={() => setPickerVisible(true)}
+          style={styles.monthHeader}
+          accessibilityRole="button"
+          accessibilityLabel={`${headerMonth}. Tap to select month and year`}
+        >
+          <Text style={styles.monthHeaderText}>{headerMonth}</Text>
+        </Pressable>
+
+        <CalendarList
+          ref={calendarListRef as any}
           current={currentMonth}
+          horizontal={true}
+          pagingEnabled={true}
           onMonthChange={onMonthChange}
-          enableSwipeMonths
+          onVisibleMonthsChange={onVisibleMonthsChange}
           dayComponent={({ date }) => renderDay(date as DateData | undefined)}
           theme={calendarTheme}
           style={styles.calendar}
+          calendarStyle={styles.calendar}
+          hideArrows
+          renderHeader={() => null}
+          pastScrollRange={50}
+          futureScrollRange={50}
+          showScrollIndicator={false}
         />
 
         {/* ── Events section (9.3.3 / 9.3.4) ── */}
@@ -431,6 +491,13 @@ export default function CalendarScreen() {
         }}
         day={selectedDate}
       />
+
+      <MonthYearPicker
+        visible={pickerVisible}
+        currentMonth={currentMonth.slice(0, 7)}
+        onSelect={handlePickerSelect}
+        onDismiss={handlePickerDismiss}
+      />
     </GestureHandlerRootView>
   );
 }
@@ -465,6 +532,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingBottom: 36, // space for collapsed drawer handle
+  },
+  monthHeader: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  monthHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'System',
   },
   calendar: {
     backgroundColor: '#121212',

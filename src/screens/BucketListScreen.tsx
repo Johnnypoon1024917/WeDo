@@ -18,6 +18,11 @@ import {
   BucketListItem,
 } from '../services/realtimeManager';
 import MemoryCreationModal from '../components/MemoryCreationModal';
+import SegmentedControl from '../components/SegmentedControl';
+import BucketListMapView from '../components/BucketListMapView';
+import PinPreviewModal from '../components/PinPreviewModal';
+import SkeletonCard from '../components/SkeletonCard';
+import LottieOverlay from '../components/LottieOverlay';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 const FREE_ITEM_LIMIT = 10;
@@ -107,6 +112,9 @@ export default function BucketListScreen() {
   const [items, setItems] = useState<BucketListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [memoryModalVisible, setMemoryModalVisible] = useState(false);
+  const [selectedSegment, setSelectedSegment] = useState(0);
+  const [previewItem, setPreviewItem] = useState<BucketListItem | null>(null);
+  const [showLottie, setShowLottie] = useState(false);
 
   /* ── initial fetch ── */
   useEffect(() => {
@@ -198,6 +206,7 @@ export default function BucketListScreen() {
 
       // On marking complete, trigger memory creation modal
       if (newCompleted) {
+        setShowLottie(true);
         setMemoryModalVisible(true);
       }
     },
@@ -236,7 +245,17 @@ export default function BucketListScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>{t('common.loading')}</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: 56 }}>
+          <SkeletonCard shape="row" />
+          <View style={{ height: 12 }} />
+          <SkeletonCard shape="row" />
+          <View style={{ height: 12 }} />
+          <SkeletonCard shape="row" />
+          <View style={{ height: 12 }} />
+          <SkeletonCard shape="row" />
+          <View style={{ height: 12 }} />
+          <SkeletonCard shape="row" />
+        </View>
       </View>
     );
   }
@@ -258,6 +277,12 @@ export default function BucketListScreen() {
         </Pressable>
       </View>
 
+      {/* Segmented Control */}
+      <SegmentedControl
+        selectedIndex={selectedSegment}
+        onChange={setSelectedSegment}
+      />
+
       {/* Item count for free users */}
       {!isPremium && (
         <Text style={styles.itemCount}>
@@ -265,16 +290,23 @@ export default function BucketListScreen() {
         </Text>
       )}
 
-      <FlatList
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        contentContainerStyle={
-          items.length === 0 ? styles.emptyList : styles.listContent
-        }
-        ListEmptyComponent={EmptyState}
-        showsVerticalScrollIndicator={false}
-      />
+      {selectedSegment === 0 ? (
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={
+            items.length === 0 ? styles.emptyList : styles.listContent
+          }
+          ListEmptyComponent={EmptyState}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <BucketListMapView
+          items={items}
+          onPinPress={setPreviewItem}
+        />
+      )}
 
       {/* FAB */}
       <Pressable
@@ -290,6 +322,18 @@ export default function BucketListScreen() {
       <MemoryCreationModal
         visible={memoryModalVisible}
         onClose={() => setMemoryModalVisible(false)}
+      />
+
+      {/* Pin Preview Modal */}
+      <PinPreviewModal
+        item={previewItem}
+        onDismiss={() => setPreviewItem(null)}
+      />
+
+      {/* Lottie celebration overlay */}
+      <LottieOverlay
+        visible={showLottie}
+        onFinish={() => setShowLottie(false)}
       />
     </View>
   );
@@ -429,11 +473,4 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
 
-  /* loading */
-  loadingText: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 40,
-  },
 });

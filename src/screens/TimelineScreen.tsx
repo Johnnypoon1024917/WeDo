@@ -24,6 +24,8 @@ import { realtimeManager, MemoryEntry } from '../services/realtimeManager';
 import ScratchOffOverlay from '../components/ScratchOffOverlay';
 import AudioPlayer from '../components/AudioPlayer';
 import AudioRecorder from '../components/AudioRecorder';
+import AnniversaryBanner from '../components/AnniversaryBanner';
+import SkeletonCard from '../components/SkeletonCard';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -137,12 +139,19 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
       style={styles.cardWrapper}
     >
       <BlurView intensity={40} tint="dark" style={styles.card}>
-        <View style={styles.photoContainer}>
-          <Image
-            source={{ uri: item.photo_url }}
-            style={styles.photo}
-            onLayout={onPhotoLayout}
-          />
+        <Pressable
+          onPress={() => navigation.navigate('MemoryDetailScreen', { memory: item })}
+          style={styles.photoContainer}
+        >
+          <Animated.View
+            {...{ sharedTransitionTag: `memory-photo-${item.id}` } as any}
+          >
+            <Image
+              source={{ uri: item.photo_url }}
+              style={styles.photo}
+              onLayout={onPhotoLayout}
+            />
+          </Animated.View>
           {isCreator && (
             <Pressable
               onPress={handleDelete}
@@ -162,7 +171,7 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
               />
             </GestureHandlerRootView>
           )}
-        </View>
+        </Pressable>
         <View style={styles.cardBody}>
           <Text style={styles.caption}>{item.caption}</Text>
           <View style={styles.cardFooter}>
@@ -322,7 +331,13 @@ export default function TimelineScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>{t('common.loading')}</Text>
+        <View style={styles.listContent}>
+          <SkeletonCard shape="card" />
+          <View style={{ height: 16 }} />
+          <SkeletonCard shape="card" />
+          <View style={{ height: 16 }} />
+          <SkeletonCard shape="card" />
+        </View>
       </View>
     );
   }
@@ -336,6 +351,7 @@ export default function TimelineScreen() {
         contentContainerStyle={
           rows.length === 0 ? styles.emptyList : styles.listContent
         }
+        ListHeaderComponent={AnniversaryBanner}
         ListEmptyComponent={EmptyState}
         showsVerticalScrollIndicator={false}
       />
@@ -454,11 +470,4 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  /* loading */
-  loadingText: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 40,
-  },
 });

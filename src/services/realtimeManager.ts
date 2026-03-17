@@ -34,6 +34,9 @@ export interface BucketListItem {
   completed: boolean;
   created_by: string;
   created_at: string;
+  latitude: number | null;
+  longitude: number | null;
+  place_name: string | null;
 }
 
 export interface CalendarEvent {

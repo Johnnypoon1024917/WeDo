@@ -61,6 +61,17 @@
         }
       ],
       "./plugins/withSocialCatcher",
+      [
+        "react-native-widget-extension",
+        {
+          "widgetName": "WeDoDaysWidget",
+          "targetName": "WeDoDaysWidget",
+          "bundleIdentifier": "com.anonymous.wedo.WeDoDaysWidget",
+          "widgetDir": "targets/widget",
+          "appGroups": ["group.com.wedo.app"],
+          "deploymentTarget": "16.0"
+        }
+      ],
       "./plugins/withWidgetBridge",
       "expo-localization"
     ]

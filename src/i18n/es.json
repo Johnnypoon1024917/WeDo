@@ -32,7 +32,10 @@
     "eventTimePlaceholder": "Hora (opcional, ej. 7:00 PM)",
     "eventTitle": "Evento — {{day}}",
     "failedSaveEvent": "Error al guardar el evento — inténtalo de nuevo.",
-    "noEvents": "No hay eventos para este día"
+    "noEvents": "No hay eventos para este día",
+    "syncToDeviceCalendar": "Sincronizar con Calendario del Dispositivo",
+    "permissionDenied": "Se requiere permiso de calendario para sincronizar eventos con tu dispositivo. El evento se guardó solo en WeDo.",
+    "syncFailed": "Evento guardado, pero la sincronización con el calendario del dispositivo falló. Inténtalo más tarde."
   },
   "bucketList": {
     "bucketList": "Lista de Deseos",
@@ -53,7 +56,10 @@
     "unlockNow": "Desbloquear Ahora",
     "tapToReveal": "Toca para revelar",
     "swipeHint": "Desliza izquierda/derecha para navegar · Toca para voltear",
-    "lockedCard": "Tarjeta bloqueada. Toca para desbloquear con premium"
+    "lockedCard": "Tarjeta bloqueada. Toca para desbloquear con premium",
+    "dailyQuestion": "Pregunta del Día",
+    "markDiscussed": "Marcar como Discutido",
+    "discussed": "Discutido ✓"
   },
   "memoryCreation": {
     "permissionNeeded": "Permiso necesario",
@@ -74,7 +80,8 @@
     "titlePlaceholder": "ej. Picnic al atardecer en la playa",
     "urlLabel": "URL (opcional)",
     "urlPlaceholder": "https://...",
-    "saveFailed": "Error al guardar — revisa tu conexión e inténtalo de nuevo"
+    "saveFailed": "Error al guardar — revisa tu conexión e inténtalo de nuevo",
+    "locationLabel": "Ubicación (opcional)"
   },
   "paywall": {
     "close": "Cerrar",

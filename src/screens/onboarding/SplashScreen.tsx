@@ -12,6 +12,7 @@ import Animated, {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingStack';
+import MeshGradient from '../../components/MeshGradient';
 
 type SplashNav = NativeStackNavigationProp<OnboardingStackParamList, 'Splash'>;
 
@@ -55,6 +56,7 @@ export default function SplashScreen() {
 
   return (
     <View className="flex-1 items-center justify-center bg-charcoal">
+      <MeshGradient />
       <Animated.View style={logoStyle} className="items-center">
         <Text className="text-soft-coral text-5xl font-bold" style={{ fontFamily: 'serif' }}>
           WeDo

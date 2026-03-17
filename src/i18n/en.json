@@ -32,7 +32,10 @@
     "eventTimePlaceholder": "Time (optional, e.g. 7:00 PM)",
     "eventTitle": "Event — {{day}}",
     "failedSaveEvent": "Failed to save event — please try again.",
-    "noEvents": "No events for this day"
+    "noEvents": "No events for this day",
+    "syncToDeviceCalendar": "Sync to Device Calendar",
+    "permissionDenied": "Calendar permission is required to sync events to your device calendar. The event was saved to WeDo only.",
+    "syncFailed": "Event saved, but device calendar sync failed. Please try again later."
   },
   "bucketList": {
     "bucketList": "Bucket List",
@@ -53,7 +56,10 @@
     "unlockNow": "Unlock Now",
     "tapToReveal": "Tap to reveal",
     "swipeHint": "Swipe left/right to navigate · Tap to flip",
-    "lockedCard": "Locked card. Tap to unlock with premium"
+    "lockedCard": "Locked card. Tap to unlock with premium",
+    "dailyQuestion": "Question of the Day",
+    "markDiscussed": "Mark as Discussed",
+    "discussed": "Discussed ✓"
   },
   "memoryCreation": {
     "permissionNeeded": "Permission needed",
@@ -74,7 +80,8 @@
     "titlePlaceholder": "e.g. Sunset picnic at the beach",
     "urlLabel": "URL (optional)",
     "urlPlaceholder": "https://...",
-    "saveFailed": "Save failed — please check your connection and try again"
+    "saveFailed": "Save failed — please check your connection and try again",
+    "locationLabel": "Location (optional)"
   },
   "paywall": {
     "close": "Close",

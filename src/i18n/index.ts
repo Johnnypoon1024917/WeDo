@@ -1,7 +1,16 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { getLocales } from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+/** Safely get device locales — returns empty array if native module is unavailable */
+function safeGetLocales(): { languageCode: string | null }[] {
+  try {
+    const { getLocales } = require('expo-localization');
+    return getLocales();
+  } catch {
+    return [];
+  }
+}
 
 import en from './en.json';
 import es from './es.json';
@@ -33,7 +42,7 @@ async function detectLanguage(): Promise<string> {
     // AsyncStorage read failed — fall through to device locale
   }
 
-  const locales = getLocales();
+  const locales = safeGetLocales();
   if (locales.length > 0) {
     const deviceLang = locales[0].languageCode;
     if (deviceLang && SUPPORTED_LANGUAGES.includes(deviceLang)) {

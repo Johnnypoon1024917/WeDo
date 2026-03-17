@@ -15,6 +15,7 @@ import {
   purchase,
   restorePurchases,
 } from '../services/purchaseService';
+import MeshGradient from '../components/MeshGradient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PaywallModal'>;
 
@@ -67,6 +68,7 @@ export default function PaywallModal({ navigation }: Props) {
 
   return (
     <View className="flex-1 bg-charcoal px-6 pt-16 pb-10 justify-between">
+      <MeshGradient />
       {/* Header */}
       <View>
         <Pressable

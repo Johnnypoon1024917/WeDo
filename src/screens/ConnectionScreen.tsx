@@ -28,6 +28,9 @@ import { useAppStore } from '../store/appStore';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
+import SkeletonCard from '../components/SkeletonCard';
+import StreakCounter from '../components/StreakCounter';
+import DailyQuestionCard from '../components/DailyQuestionCard';
 import prompts from '../assets/deep_questions.json';
 
 interface Prompt {
@@ -243,6 +246,8 @@ function SwipeableCard({
 export default function ConnectionScreen() {
   const { t } = useTranslation();
   const isPremium = useAppStore((s) => s.isPremium);
+  const relationshipId = useAppStore((s) => s.relationshipId);
+  const user = useAppStore((s) => s.user);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [deck, setDeck] = useState<Prompt[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -317,8 +322,13 @@ export default function ConnectionScreen() {
 
   if (deck.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center bg-charcoal">
-        <Text className="text-gray-400 text-base">{t('common.loading')}</Text>
+      <View className="flex-1 bg-charcoal" style={styles.container}>
+        <View style={styles.header}>
+          <SkeletonCard shape="row" />
+        </View>
+        <View style={styles.cardArea}>
+          <SkeletonCard shape="card" />
+        </View>
       </View>
     );
   }
@@ -330,11 +340,28 @@ export default function ConnectionScreen() {
       <View className="flex-1 bg-charcoal" style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text className="text-white text-2xl font-bold">{t('connection.connection')}</Text>
-          <Text className="text-gray-400 text-sm mt-1">
-            {t('connection.subtitle')}
-          </Text>
+          <View style={styles.headerRow}>
+            <View>
+              <Text className="text-white text-2xl font-bold">{t('connection.connection')}</Text>
+              <Text className="text-gray-400 text-sm mt-1">
+                {t('connection.subtitle')}
+              </Text>
+            </View>
+            {relationshipId ? (
+              <StreakCounter relationshipId={relationshipId} />
+            ) : null}
+          </View>
         </View>
+
+        {/* Daily Question Card */}
+        {relationshipId && user ? (
+          <View style={styles.dailyQuestionWrapper}>
+            <DailyQuestionCard
+              relationshipId={relationshipId}
+              userId={user.id}
+            />
+          </View>
+        ) : null}
 
         {/* Card area */}
         <View style={styles.cardArea}>
@@ -379,7 +406,16 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  dailyQuestionWrapper: {
+    paddingHorizontal: 24,
+    marginBottom: 8,
   },
   cardArea: {
     flex: 1,

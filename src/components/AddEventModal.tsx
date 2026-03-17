@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -13,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
+import { requestPermissions, syncEventToDevice } from '../services/deviceCalendarService';
 
 interface AddEventModalProps {
   visible: boolean;
@@ -24,9 +27,11 @@ export default function AddEventModal({ visible, onClose, day }: AddEventModalPr
   const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const relationshipId = useAppStore((s) => s.relationshipId);
+  const isPremium = useAppStore((s) => s.isPremium);
 
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
+  const [syncEnabled, setSyncEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +57,23 @@ export default function AddEventModal({ visible, onClose, day }: AddEventModalPr
 
       if (insertError) throw insertError;
 
+      // Attempt device calendar sync if toggle is enabled
+      if (syncEnabled) {
+        const granted = await requestPermissions();
+        if (!granted) {
+          Alert.alert(t('common.ok'), t('calendar.permissionDenied'));
+        } else {
+          const result = await syncEventToDevice({
+            title: trimmedTitle,
+            date: day,
+            time: time.trim() || undefined,
+          });
+          if (!result.success) {
+            Alert.alert(t('common.error'), t('calendar.syncFailed'));
+          }
+        }
+      }
+
       handleClose();
     } catch {
       setError(t('calendar.failedSaveEvent'));
@@ -63,6 +85,7 @@ export default function AddEventModal({ visible, onClose, day }: AddEventModalPr
   const handleClose = () => {
     setTitle('');
     setTime('');
+    setSyncEnabled(false);
     setError(null);
     onClose();
   };
@@ -105,6 +128,20 @@ export default function AddEventModal({ visible, onClose, day }: AddEventModalPr
           value={time}
           onChangeText={setTime}
         />
+
+        {/* Sync to Device Calendar Toggle (Premium only) */}
+        {isPremium && (
+          <View style={styles.syncRow}>
+            <Text style={styles.syncLabel}>{t('calendar.syncToDeviceCalendar')}</Text>
+            <Switch
+              value={syncEnabled}
+              onValueChange={setSyncEnabled}
+              trackColor={{ false: '#3E3E3E', true: '#FF7F50' }}
+              thumbColor="#FFFFFF"
+              accessibilityLabel={t('calendar.syncToDeviceCalendar')}
+            />
+          </View>
+        )}
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -164,6 +201,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 12,
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingHorizontal: 4,
+  },
+  syncLabel: {
+    color: '#D1D5DB',
+    fontSize: 15,
   },
   saveButton: {
     backgroundColor: '#FF7F50',
