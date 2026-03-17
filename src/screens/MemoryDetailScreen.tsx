@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Dimensions,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -54,16 +53,14 @@ export default function MemoryDetailScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Full-screen photo with shared transition tag */}
-        <Animated.View
-          {...{ sharedTransitionTag: `memory-photo-${memory.id}` } as any}
-          style={styles.photoContainer}
-        >
-          <Image
+        <View style={styles.photoContainer}>
+          <Animated.Image
             source={{ uri: memory.photo_url }}
             style={styles.photo}
             resizeMode="cover"
+            {...{ sharedTransitionTag: `memory-photo-${memory.id}` } as any}
           />
-        </Animated.View>
+        </View>
 
         {/* Caption and metadata with entering animation */}
         <Animated.View
@@ -117,12 +114,10 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   photo: {
-    width: '100%',
-    height: '100%',
-  },
-  photoContainer: {
     width: SCREEN_WIDTH,
     aspectRatio: 4 / 3,
+  },
+  photoContainer: {
     overflow: 'hidden',
   },
   content: {

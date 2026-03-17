@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Image,
   LayoutChangeEvent,
   Pressable,
   StyleSheet,
@@ -13,7 +12,7 @@ import { BlurView } from 'expo-blur';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   FadeInDown,
-  Layout,
+  LinearTransition,
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -147,7 +146,7 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
   return (
     <Animated.View
       entering={FadeInDown.springify().damping(15).stiffness(120)}
-      layout={Layout.springify()}
+      layout={LinearTransition.springify()}
       style={styles.cardWrapper}
     >
       <BlurView intensity={40} tint="dark" style={styles.card}>
@@ -155,15 +154,12 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
           onPress={() => navigation.navigate('MemoryDetailScreen', { memory: item })}
           style={styles.photoContainer}
         >
-          <Animated.View
+          <Animated.Image
+            source={{ uri: item.photo_url }}
+            style={styles.photo}
+            onLayout={onPhotoLayout}
             {...{ sharedTransitionTag: `memory-photo-${item.id}` } as any}
-          >
-            <Image
-              source={{ uri: item.photo_url }}
-              style={styles.photo}
-              onLayout={onPhotoLayout}
-            />
-          </Animated.View>
+          />
           {isCreator && (
             <Pressable
               onPress={handleDelete}
