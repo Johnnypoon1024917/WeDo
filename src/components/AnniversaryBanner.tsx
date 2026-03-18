@@ -39,7 +39,7 @@ export default function AnniversaryBanner() {
 
   return (
     <Pressable
-      onPress={() => navigation.navigate('YearInReviewModal')}
+      onPress={() => navigation.navigate('WrappedScreen')}
       accessibilityRole="button"
       accessibilityLabel="View year in review"
     >

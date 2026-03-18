@@ -14,6 +14,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
+import { feedPet } from '../services/petService';
 import {
   realtimeManager,
   BucketListItem,
@@ -224,8 +225,11 @@ export default function BucketListScreen() {
         return;
       }
 
-      // On marking complete, trigger memory creation modal
+      // On marking complete, feed the relationship pet and trigger memory creation modal
       if (newCompleted) {
+        if (relationshipId) {
+          feedPet(relationshipId, 20, 20).catch(() => {});
+        }
         setCompletingItemId(item.id);
         setShowLottie(true);
         setMemoryModalVisible(true);

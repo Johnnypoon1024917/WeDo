@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { User, Session } from '@supabase/supabase-js';
+import type { PetState } from '../services/petService';
 
 type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
 
@@ -29,6 +30,13 @@ interface AppStore {
   // Relationship metadata
   relationshipStartDate: string | null;
   setRelationshipStartDate: (date: string) => void;
+
+  // Pet state
+  petName: string | null;
+  petHealth: number;
+  petTotalXp: number;
+  petLastFedAt: string | null;
+  setPetState: (state: PetState) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -64,6 +72,19 @@ export const useAppStore = create<AppStore>((set) => ({
   // Relationship metadata
   relationshipStartDate: null,
   setRelationshipStartDate: (date) => set({ relationshipStartDate: date }),
+
+  // Pet state
+  petName: null,
+  petHealth: 0,
+  petTotalXp: 0,
+  petLastFedAt: null,
+  setPetState: (state) =>
+    set({
+      petName: state.petName,
+      petHealth: state.petHealth,
+      petTotalXp: state.petTotalXp,
+      petLastFedAt: state.petLastFedAt,
+    }),
 }));
 
 export type { AppStore };

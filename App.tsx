@@ -8,6 +8,9 @@ import {
 } from '@react-navigation/native';
 import { AppState, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
+import { Nunito_400Regular, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
+import * as SplashScreen from 'expo-splash-screen';
 import RootNavigator from './src/navigation/RootNavigator';
 import type { RootStackParamList } from './src/navigation/RootNavigator';
 import PrivacyVaultOverlay from './src/components/PrivacyVaultOverlay';
@@ -18,6 +21,8 @@ import {
   checkEntitlement,
 } from './src/services/purchaseService';
 import { syncWidgetData } from './src/services/widgetBridge';
+
+SplashScreen.preventAutoHideAsync();
 
 const WedoTheme = {
   ...DefaultTheme,
@@ -60,6 +65,18 @@ export default function App() {
   const user = useAppStore((s) => s.user);
   const relationshipId = useAppStore((s) => s.relationshipId);
   const appState = useRef(AppState.currentState);
+
+  const [fontsLoaded, fontError] = useFonts({
+    PlayfairDisplay_700Bold,
+    Nunito_400Regular,
+    Nunito_600SemiBold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
 
   // Configure RevenueCat SDK on app load
   useEffect(() => {
@@ -105,6 +122,8 @@ export default function App() {
 
     return () => subscription.remove();
   }, []);
+
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <NavigationContainer ref={navigationRef} theme={WedoTheme}>

@@ -7,7 +7,7 @@ import PaywallModal from '../screens/PaywallModal';
 import AddToListModal from '../screens/AddToListModal';
 import WheelScreen from '../screens/WheelScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
-import YearInReviewModal from '../screens/YearInReviewModal';
+import WrappedScreen from '../screens/WrappedScreen';
 import { MemoryEntry } from '../services/realtimeManager';
 
 export type RootStackParamList = {
@@ -17,7 +17,7 @@ export type RootStackParamList = {
   AddToListModal: { url?: string } | undefined;
   WheelScreen: undefined;
   MemoryDetailScreen: { memory: MemoryEntry };
-  YearInReviewModal: undefined;
+  WrappedScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -58,8 +58,8 @@ export default function RootNavigator() {
         options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }}
       />
       <Stack.Screen
-        name="YearInReviewModal"
-        component={YearInReviewModal}
+        name="WrappedScreen"
+        component={WrappedScreen}
         options={{ presentation: 'modal' }}
       />
     </Stack.Navigator>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -8,12 +8,19 @@ import {
   Text,
   View,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   FadeInDown,
   LinearTransition,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withDelay,
+  withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { Heart, Trash2, Mic } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +31,9 @@ import ScratchOffOverlay from '../components/ScratchOffOverlay';
 import AudioPlayer from '../components/AudioPlayer';
 import AudioRecorder from '../components/AudioRecorder';
 import AnniversaryBanner from '../components/AnniversaryBanner';
+import RelationshipPet from '../components/RelationshipPet';
 import SkeletonCard from '../components/SkeletonCard';
+import { loadAndDecayPet, feedPet } from '../services/petService';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -59,7 +68,22 @@ function extractStoragePath(publicUrl: string): string | null {
 
 /* ── MemoryCard ──────────────────────────────────────────────── */
 
+export function generateTilt(): number {
+  return (Math.random() * 6) - 3;
+}
+
+export function triggerHeartAnimation(
+  heartScale: { value: number },
+  heartOpacity: { value: number }
+) {
+  heartScale.value = 0;
+  heartOpacity.value = 1;
+  heartScale.value = withSpring(1.5, { damping: 6, stiffness: 120 });
+  heartOpacity.value = withDelay(400, withTiming(0, { duration: 300 }));
+}
+
 function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: string) => void }) {
+  const tilt = useMemo(() => generateTilt(), []);
   const { t } = useTranslation();
   const currentUserId = useAppStore((s) => s.user?.id);
   const isPremium = useAppStore((s) => s.isPremium);
@@ -143,47 +167,92 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
     );
   }, [item, onDelete, t]);
 
+  // Heart animation shared values
+  const heartScale = useSharedValue(0);
+  const heartOpacity = useSharedValue(0);
+
+  const heartAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
+    opacity: heartOpacity.value,
+  }));
+
+  const handleDoubleTap = useCallback(() => {
+    triggerHeartAnimation(heartScale, heartOpacity);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Upsert like to Supabase
+    supabase.from('memory_likes').upsert({
+      memory_id: item.id,
+      user_id: currentUserId,
+    });
+    // Feed the pet on double-tap heart
+    if (relationshipId) {
+      feedPet(relationshipId, 5, 5).catch(() => {});
+    }
+  }, [item.id, currentUserId, heartScale, heartOpacity, relationshipId]);
+
+  const handleSingleTap = useCallback(() => {
+    navigation.navigate('MemoryDetailScreen', { memory: item });
+  }, [navigation, item]);
+
+  // Gesture composition
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      runOnJS(handleDoubleTap)();
+    });
+
+  const singleTap = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      runOnJS(handleSingleTap)();
+    });
+
+  const composedGesture = Gesture.Exclusive(doubleTap, singleTap);
+
   return (
     <Animated.View
       entering={FadeInDown.springify().damping(15).stiffness(120)}
       layout={LinearTransition.springify()}
-      style={styles.cardWrapper}
+      style={[styles.cardWrapper, { transform: [{ rotate: `${tilt}deg` }] }]}
     >
-      <BlurView intensity={40} tint="dark" style={styles.card}>
-        <Pressable
-          onPress={() => navigation.navigate('MemoryDetailScreen', { memory: item })}
-          style={styles.photoContainer}
-        >
-          <Animated.Image
-            source={{ uri: item.photo_url }}
-            style={styles.photo}
-            onLayout={onPhotoLayout}
-            // @ts-expect-error sharedTransitionTag not in reanimated types yet
-            sharedTransitionTag={`memory-photo-${item.id}`}
-          />
-          {isCreator && (
-            <Pressable
-              onPress={handleDelete}
-              style={styles.deleteButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('timeline.deleteMemory')}
-            >
-              <Text style={styles.deleteIcon}>🗑️</Text>
-            </Pressable>
-          )}
-          {showOverlay && photoLayout.width > 0 && (
-            <GestureHandlerRootView style={StyleSheet.absoluteFill}>
-              <ScratchOffOverlay
-                memoryId={item.id}
-                width={photoLayout.width}
-                height={photoLayout.height}
-              />
-            </GestureHandlerRootView>
-          )}
-        </Pressable>
+      <View style={styles.card}>
+        <GestureDetector gesture={composedGesture}>
+          <View style={styles.photoContainer}>
+            <Animated.Image
+              source={{ uri: item.photo_url }}
+              style={styles.photo}
+              onLayout={onPhotoLayout}
+              // @ts-expect-error sharedTransitionTag not in reanimated types yet
+              sharedTransitionTag={`memory-photo-${item.id}`}
+            />
+            <Animated.View style={[styles.heartOverlay, heartAnimatedStyle]} pointerEvents="none">
+              <Heart size={80} color="#E74C3C" fill="#E74C3C" />
+            </Animated.View>
+            {isCreator && (
+              <Pressable
+                onPress={handleDelete}
+                style={styles.deleteButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('timeline.deleteMemory')}
+              >
+                <Trash2 size={16} color="#FFFFFF" />
+              </Pressable>
+            )}
+            {showOverlay && photoLayout.width > 0 && (
+              <GestureHandlerRootView style={StyleSheet.absoluteFill}>
+                <ScratchOffOverlay
+                  memoryId={item.id}
+                  width={photoLayout.width}
+                  height={photoLayout.height}
+                />
+              </GestureHandlerRootView>
+            )}
+          </View>
+        </GestureDetector>
         <View style={styles.cardBody}>
           <Text style={styles.caption}>{item.caption}</Text>
           <View style={styles.cardFooter}>
+            <Heart size={14} color="#E74C3C" fill="#E74C3C" />
             <Text style={styles.timestamp}>{formatTime(item.created_at)}</Text>
             {showMicIcon && (
               <Pressable
@@ -192,7 +261,7 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
                 accessibilityRole="button"
                 accessibilityLabel={t('timeline.addVoiceNote')}
               >
-                <Text style={styles.micIcon}>🎙️</Text>
+                <Mic size={16} color="#FF7F50" />
               </Pressable>
             )}
           </View>
@@ -206,7 +275,7 @@ function MemoryCard({ item, onDelete }: { item: MemoryEntry; onDelete: (id: stri
             />
           )}
         </View>
-      </BlurView>
+      </View>
     </Animated.View>
   );
 }
@@ -258,6 +327,11 @@ function buildRows(memories: MemoryEntry[]): Row[] {
 export default function TimelineScreen() {
   const { t } = useTranslation();
   const relationshipId = useAppStore((s) => s.relationshipId);
+  const petName = useAppStore((s) => s.petName);
+  const petHealth = useAppStore((s) => s.petHealth);
+  const petTotalXp = useAppStore((s) => s.petTotalXp);
+  const petLastFedAt = useAppStore((s) => s.petLastFedAt);
+  const setPetState = useAppStore((s) => s.setPetState);
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const memoriesRef = useRef<MemoryEntry[]>([]);
@@ -266,6 +340,16 @@ export default function TimelineScreen() {
   useEffect(() => {
     memoriesRef.current = memories;
   }, [memories]);
+
+  /* ── load & decay pet ── */
+  useEffect(() => {
+    if (!relationshipId) return;
+    loadAndDecayPet(relationshipId)
+      .then((petState) => setPetState(petState))
+      .catch(() => {
+        // Silently ignore — pet UI simply won't render
+      });
+  }, [relationshipId, setPetState]);
 
   /* ── initial fetch ── */
   useEffect(() => {
@@ -360,7 +444,21 @@ export default function TimelineScreen() {
         contentContainerStyle={
           rows.length === 0 ? styles.emptyList : styles.listContent
         }
-        ListHeaderComponent={AnniversaryBanner}
+        ListHeaderComponent={
+          <>
+            {petName != null && petLastFedAt != null && (
+              <RelationshipPet
+                petState={{
+                  petName,
+                  petHealth,
+                  petTotalXp,
+                  petLastFedAt,
+                }}
+              />
+            )}
+            <AnniversaryBanner />
+          </>
+        }
         ListEmptyComponent={EmptyState}
         showsVerticalScrollIndicator={false}
       />
@@ -373,7 +471,7 @@ export default function TimelineScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#FAFAFA',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -389,9 +487,9 @@ const styles = StyleSheet.create({
 
   /* date header */
   dateHeader: {
-    fontFamily: 'serif',
+    fontFamily: 'PlayfairDisplay_700Bold',
     fontSize: 16,
-    color: '#40E0D0',
+    color: '#4A4A4A',
     marginTop: 20,
     marginBottom: 8,
   },
@@ -399,19 +497,25 @@ const styles = StyleSheet.create({
   /* card */
   cardWrapper: {
     marginBottom: 16,
-    borderRadius: 16,
+    borderRadius: 4,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 4,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#FAFAFA',
+    padding: 12,
+    paddingBottom: 24,
   },
   photo: {
     width: '100%',
-    aspectRatio: 4 / 3,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    aspectRatio: 1,
+    borderRadius: 2,
   },
   photoContainer: {
     position: 'relative',
@@ -428,16 +532,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
-  deleteIcon: {
-    fontSize: 16,
+
+  heartOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
   },
   cardBody: {
     padding: 14,
   },
   caption: {
-    fontFamily: 'System',
+    fontFamily: 'PlayfairDisplay_700Bold',
     fontSize: 15,
-    color: '#FFFFFF',
+    color: '#2C2C2C',
     lineHeight: 22,
   },
   cardFooter: {
@@ -447,9 +559,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   timestamp: {
-    fontFamily: 'System',
+    fontFamily: 'Nunito_400Regular',
     fontSize: 12,
-    color: '#40E0D0',
+    color: '#8B8B8B',
   },
   micButton: {
     width: 32,
@@ -459,9 +571,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  micIcon: {
-    fontSize: 16,
-  },
+
 
   /* empty state */
   emptyContainer: {
@@ -472,9 +582,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyText: {
-    fontFamily: 'System',
+    fontFamily: 'Nunito_400Regular',
     fontSize: 16,
-    color: '#9CA3AF',
+    color: '#6B6B6B',
     textAlign: 'center',
     lineHeight: 24,
   },

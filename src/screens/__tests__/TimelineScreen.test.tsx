@@ -40,6 +40,11 @@ jest.mock('../../store/appStore', () => ({
       relationshipId: 'rel-123',
       connectionStatus: 'connected',
       setConnectionStatus: jest.fn(),
+      petName: null,
+      petHealth: 0,
+      petTotalXp: 0,
+      petLastFedAt: null,
+      setPetState: jest.fn(),
     })
   ),
 }));
@@ -49,6 +54,15 @@ jest.mock('../../services/realtimeManager', () => ({
     subscribeToMemories: jest.fn(() => ({ unsubscribe: jest.fn() })),
   },
   MemoryEntry: {},
+}));
+
+jest.mock('../../services/petService', () => ({
+  loadAndDecayPet: jest.fn(() => Promise.resolve({
+    petName: 'Buddy',
+    petHealth: 80,
+    petTotalXp: 50,
+    petLastFedAt: new Date().toISOString(),
+  })),
 }));
 
 jest.mock('react-i18next', () => ({
@@ -80,21 +94,61 @@ jest.mock('../../components/SkeletonCard', () => {
   const { View } = require('react-native');
   return { __esModule: true, default: () => <View testID="skeleton-card" /> };
 });
+jest.mock('../../components/RelationshipPet', () => {
+  const { View } = require('react-native');
+  return { __esModule: true, default: () => <View testID="relationship-pet" /> };
+});
 jest.mock('expo-blur', () => {
   const { View } = require('react-native');
   return { BlurView: (props: any) => <View {...props} /> };
 });
 jest.mock('react-native-gesture-handler', () => {
   const { View } = require('react-native');
-  return { GestureHandlerRootView: (props: any) => <View {...props} /> };
+  const mockTap = () => {
+    const gesture: any = {
+      numberOfTaps: () => gesture,
+      onEnd: () => gesture,
+    };
+    return gesture;
+  };
+  return {
+    GestureHandlerRootView: (props: any) => <View {...props} />,
+    GestureDetector: ({ children }: any) => children,
+    Gesture: {
+      Tap: mockTap,
+      Exclusive: (..._args: any[]) => ({}),
+    },
+  };
 });
 jest.mock('react-native-reanimated', () => {
-  const { View } = require('react-native');
+  const { View, Image } = require('react-native');
   return {
     __esModule: true,
-    default: { View: (props: any) => <View {...props} /> },
+    default: {
+      View: (props: any) => <View {...props} />,
+      Image: (props: any) => <Image {...props} />,
+    },
     FadeInDown: { springify: () => ({ damping: () => ({ stiffness: () => ({}) }) }) },
+    LinearTransition: { springify: () => ({}) },
     Layout: { springify: () => ({}) },
+    useSharedValue: (val: number) => ({ value: val }),
+    useAnimatedStyle: (fn: () => any) => fn(),
+    withSpring: (val: number) => val,
+    withDelay: (_delay: number, val: number) => val,
+    withTiming: (val: number) => val,
+    runOnJS: (fn: any) => fn,
+  };
+});
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn(),
+  ImpactFeedbackStyle: { Medium: 'medium' },
+}));
+jest.mock('lucide-react-native', () => {
+  const { View } = require('react-native');
+  return {
+    Heart: (props: any) => <View testID="heart-icon" {...props} />,
+    Trash2: (props: any) => <View testID="trash2-icon" {...props} />,
+    Mic: (props: any) => <View testID="mic-icon" {...props} />,
   };
 });
 
@@ -163,6 +217,11 @@ beforeEach(() => {
           })),
         })),
         delete: mockDbDeleteFn,
+      };
+    }
+    if (table === 'memory_likes') {
+      return {
+        upsert: jest.fn(() => Promise.resolve({ data: null, error: null })),
       };
     }
     return {

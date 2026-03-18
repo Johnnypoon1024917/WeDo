@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import { compress } from '../services/imageCompressor';
+import { feedPet } from '../services/petService';
 import * as Crypto from 'expo-crypto';
 
 const MAX_CAPTION = 500;
@@ -137,7 +138,12 @@ export default function MemoryCreationModal({
 
       if (insertError) throw insertError;
 
-      // 6. Success — reset and close
+      // 6. Feed the relationship pet (fire-and-forget)
+      if (relationshipId) {
+        feedPet(relationshipId, 20, 20).catch(() => {});
+      }
+
+      // 7. Success — reset and close
       resetAndClose();
     } catch (err: any) {
       setError(t('memoryCreation.uploadFailed'));
