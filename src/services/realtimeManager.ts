@@ -11,6 +11,7 @@ export interface MemoryEntry {
   caption: string;
   revealed: boolean;
   audio_url: string | null;
+  bucket_list_id: string | null;
   created_at: string;
 }
 

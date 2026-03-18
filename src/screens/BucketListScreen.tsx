@@ -7,7 +7,8 @@ import {
   View,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import LottieView from 'lottie-react-native';
+import Animated, { FadeInDown, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,7 @@ import LottieOverlay from '../components/LottieOverlay';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 const FREE_ITEM_LIMIT = 10;
+const CHECKMARK_ANIMATION = require('../../assets/animations/checkmark-confetti.json');
 
 /* ── BucketListRow ───────────────────────────────────────────── */
 
@@ -39,6 +41,20 @@ function BucketListRow({
   onDelete: (item: BucketListItem) => void;
 }) {
   const { t } = useTranslation();
+  const progress = useSharedValue(item.completed ? 1 : 0);
+
+  const handlePress = useCallback(() => {
+    if (item.completed) {
+      // Uncompleting: instantly reset to 0
+      progress.value = 0;
+      onToggleComplete(item);
+    } else {
+      // Completing: animate 0 → 1, then call onToggleComplete
+      progress.value = withTiming(1, { duration: 600 }, () => {});
+      onToggleComplete(item);
+    }
+  }, [item, onToggleComplete, progress]);
+
   return (
     <Animated.View
       entering={FadeInDown.springify().damping(15).stiffness(120)}
@@ -47,14 +63,17 @@ function BucketListRow({
       <BlurView intensity={40} tint="dark" style={styles.card}>
         <Pressable
           style={styles.checkbox}
-          onPress={() => onToggleComplete(item)}
+          onPress={handlePress}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: item.completed }}
           accessibilityLabel={t('bucketList.markItem', { title: item.title, state: item.completed ? t('bucketList.incomplete') : t('bucketList.complete') })}
         >
-          <Text style={styles.checkboxIcon}>
-            {item.completed ? '✅' : '⬜'}
-          </Text>
+          <LottieView
+            source={CHECKMARK_ANIMATION}
+            progress={progress}
+            style={styles.lottieCheckbox}
+            loop={false}
+          />
         </Pressable>
 
         <View style={styles.rowContent}>
@@ -115,6 +134,7 @@ export default function BucketListScreen() {
   const [selectedSegment, setSelectedSegment] = useState(0);
   const [previewItem, setPreviewItem] = useState<BucketListItem | null>(null);
   const [showLottie, setShowLottie] = useState(false);
+  const [completingItemId, setCompletingItemId] = useState<string | null>(null);
 
   /* ── initial fetch ── */
   useEffect(() => {
@@ -206,6 +226,7 @@ export default function BucketListScreen() {
 
       // On marking complete, trigger memory creation modal
       if (newCompleted) {
+        setCompletingItemId(item.id);
         setShowLottie(true);
         setMemoryModalVisible(true);
       }
@@ -321,7 +342,11 @@ export default function BucketListScreen() {
       {/* Memory Creation Modal */}
       <MemoryCreationModal
         visible={memoryModalVisible}
-        onClose={() => setMemoryModalVisible(false)}
+        onClose={() => {
+          setMemoryModalVisible(false);
+          setCompletingItemId(null);
+        }}
+        bucketListId={completingItemId}
       />
 
       {/* Pin Preview Modal */}
@@ -408,6 +433,10 @@ const styles = StyleSheet.create({
   },
   checkboxIcon: {
     fontSize: 22,
+  },
+  lottieCheckbox: {
+    width: 28,
+    height: 28,
   },
   rowContent: {
     flex: 1,

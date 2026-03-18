@@ -17,17 +17,20 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import { compress } from '../services/imageCompressor';
+import * as Crypto from 'expo-crypto';
 
 const MAX_CAPTION = 500;
 
 interface MemoryCreationModalProps {
   visible: boolean;
   onClose: () => void;
+  bucketListId?: string | null;
 }
 
 export default function MemoryCreationModal({
   visible,
   onClose,
+  bucketListId,
 }: MemoryCreationModalProps) {
   const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
@@ -94,7 +97,13 @@ export default function MemoryCreationModal({
       const compressed = await compress(photoUri!);
 
       // 2. Generate entry ID
-      const entryId = crypto.randomUUID();
+      let entryId: string;
+      try {
+        entryId = Crypto.randomUUID();
+      } catch {
+        setError(t('memoryCreation.uploadFailed'));
+        return;
+      }
 
       // 3. Upload to Supabase Storage
       const storagePath = `${relationshipId}/memories/${entryId}.jpg`;
@@ -123,6 +132,7 @@ export default function MemoryCreationModal({
         photo_url: urlData.publicUrl,
         caption: captionTrimmed,
         revealed: false,
+        bucket_list_id: bucketListId ?? null,
       });
 
       if (insertError) throw insertError;

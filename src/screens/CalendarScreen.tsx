@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  FlatList,
   Image,
   LayoutRectangle,
   Pressable,
@@ -14,6 +13,7 @@ import type { CalendarListImperativeMethods } from 'react-native-calendars/src/c
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
+import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import {
@@ -22,6 +22,7 @@ import {
   CalendarEvent,
 } from '../services/realtimeManager';
 import { DEFAULT_STICKERS } from '../assets/stickers/stickerData';
+import { getMonthRange, groupEventsByDay, sortEventsChronologically } from '../utils/calendarHelpers';
 import StickerDrawer from '../components/StickerDrawer';
 import DayNoteModal from '../components/DayNoteModal';
 import AddEventModal from '../components/AddEventModal';
@@ -67,8 +68,14 @@ export default function CalendarScreen() {
 
   // Events state (9.3.1)
   const [selectedDate, setSelectedDate] = useState(todayString());
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [addEventModalVisible, setAddEventModalVisible] = useState(false);
+
+  // Month-level events lookup (6.1)
+  const [monthEvents, setMonthEvents] = useState<Map<string, CalendarEvent[]>>(new Map());
+
+  // Bottom sheet ref and snap points (6.3)
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const snapPoints = useMemo(() => ['25%', '50%'], []);
 
   // Track day cell layouts for drop resolution
   // Key: "YYYY-MM-DD", Value: page-level bounding rect
@@ -142,11 +149,37 @@ export default function CalendarScreen() {
     fetchNotesForMonth();
   }, [fetchNotesForMonth]);
 
+  /* ── fetch events for visible month (6.1) ── */
+  const fetchEventsForMonth = useCallback(async (year: number, month: number) => {
+    if (!relationshipId) return;
+
+    const { firstDay, lastDay } = getMonthRange(year, month);
+
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('relationship_id', relationshipId)
+      .gte('day', firstDay)
+      .lte('day', lastDay);
+
+    if (!error && data) {
+      setMonthEvents(groupEventsByDay(data as CalendarEvent[]));
+    }
+  }, [relationshipId]);
+
+  // Fetch events for the current month on mount
+  useEffect(() => {
+    const [year, month] = currentMonth.split('-').map(Number);
+    fetchEventsForMonth(year, month);
+  }, [fetchEventsForMonth, currentMonth]);
+
   /* ── day press handler ── */
   const handleDayPress = useCallback((dateString: string) => {
     setSelectedDay(dateString);
     setSelectedDate(dateString);
     setDayNoteModalVisible(true);
+    // Open bottom sheet agenda (6.3)
+    bottomSheetRef.current?.snapToIndex(0);
   }, []);
 
   const handleDayNoteClose = useCallback(() => {
@@ -156,25 +189,13 @@ export default function CalendarScreen() {
     fetchNotesForMonth();
   }, [fetchNotesForMonth]);
 
-  /* ── fetch events for selected date (9.3.2) ── */
+  /* ── fetch events for selected date (refreshes monthEvents) ── */
   const fetchEventsForDate = useCallback(async (date: string) => {
     if (!relationshipId) return;
-
-    const { data, error } = await supabase
-      .from('calendar_events')
-      .select('*')
-      .eq('relationship_id', relationshipId)
-      .eq('day', date)
-      .order('time', { ascending: true, nullsFirst: false });
-
-    if (!error && data) {
-      setEvents(data as CalendarEvent[]);
-    }
-  }, [relationshipId]);
-
-  useEffect(() => {
-    fetchEventsForDate(selectedDate);
-  }, [fetchEventsForDate, selectedDate]);
+    // Re-fetch the current month's events to keep monthEvents in sync
+    const [year, month] = date.split('-').map(Number);
+    fetchEventsForMonth(year, month);
+  }, [relationshipId, fetchEventsForMonth]);
 
   /* ── realtime subscription for calendar events (9.3.6) ── */
   useEffect(() => {
@@ -183,24 +204,36 @@ export default function CalendarScreen() {
     const channel = realtimeManager.subscribeToCalendarEvents(
       relationshipId,
       (event) => {
-        // Only add to local state if it matches the selected date
-        if (event.day === selectedDate) {
-          setEvents((prev) => {
-            if (prev.some((e) => e.id === event.id)) return prev;
-            return [...prev, event];
-          });
-        }
+        // Add new event to monthEvents map
+        setMonthEvents((prev) => {
+          const updated = new Map(prev);
+          const existing = updated.get(event.day) ?? [];
+          if (existing.some((e) => e.id === event.id)) return prev;
+          updated.set(event.day, [...existing, event]);
+          return updated;
+        });
       },
       (event) => {
-        // Remove deleted event from local state
-        setEvents((prev) => prev.filter((e) => e.id !== event.id));
+        // Remove deleted event from monthEvents map
+        setMonthEvents((prev) => {
+          const updated = new Map(prev);
+          const existing = updated.get(event.day);
+          if (!existing) return prev;
+          const filtered = existing.filter((e) => e.id !== event.id);
+          if (filtered.length === 0) {
+            updated.delete(event.day);
+          } else {
+            updated.set(event.day, filtered);
+          }
+          return updated;
+        });
       },
     );
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [relationshipId, selectedDate]);
+  }, [relationshipId]);
 
   /* ── delete event (9.3.5) ── */
   const handleDeleteEvent = useCallback((eventId: string, eventTitle: string) => {
@@ -211,7 +244,18 @@ export default function CalendarScreen() {
         style: 'destructive',
         onPress: async () => {
           await supabase.from('calendar_events').delete().eq('id', eventId);
-          setEvents((prev) => prev.filter((e) => e.id !== eventId));
+          setMonthEvents((prev) => {
+            const updated = new Map(prev);
+            for (const [day, dayEvents] of updated.entries()) {
+              const filtered = dayEvents.filter((e) => e.id !== eventId);
+              if (filtered.length === 0) {
+                updated.delete(day);
+              } else if (filtered.length !== dayEvents.length) {
+                updated.set(day, filtered);
+              }
+            }
+            return updated;
+          });
         },
       },
     ]);
@@ -297,6 +341,7 @@ export default function CalendarScreen() {
 
       const dayStickers = stickersByDay.current.get(date.dateString) ?? [];
       const hasNote = daysWithNotes.has(date.dateString);
+      const hasEvents = monthEvents.has(date.dateString);
 
       return (
         <Pressable
@@ -324,8 +369,17 @@ export default function CalendarScreen() {
           >
             {date.day}
           </Text>
-          {/* Note indicator dot */}
-          {hasNote && <View style={styles.noteDot} />}
+          {/* Indicator dots */}
+          {hasNote && hasEvents ? (
+            <View style={{ flexDirection: 'row', gap: 3 }}>
+              <View style={styles.noteDot} />
+              <View style={styles.eventDot} />
+            </View>
+          ) : hasNote ? (
+            <View style={styles.noteDot} />
+          ) : hasEvents ? (
+            <View style={styles.eventDot} />
+          ) : null}
           {/* Render placed stickers */}
           {dayStickers.map((st) => (
             <Pressable
@@ -359,7 +413,7 @@ export default function CalendarScreen() {
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stickers, customStickerUrls, handleDeleteSticker, daysWithNotes, handleDayPress],
+    [stickers, customStickerUrls, handleDeleteSticker, daysWithNotes, handleDayPress, monthEvents],
   );
 
   const onMonthChange = useCallback((month: DateData) => {
@@ -369,7 +423,9 @@ export default function CalendarScreen() {
     setHeaderMonth(d.toLocaleString('default', { month: 'long', year: 'numeric' }));
     // Clear cached layouts since cells will re-render
     dayCellLayouts.current.clear();
-  }, []);
+    // Fetch events for the new month
+    fetchEventsForMonth(month.year, month.month);
+  }, [fetchEventsForMonth]);
 
   /** Called by CalendarList when visible months change during scroll */
   const onVisibleMonthsChange = useCallback((months: DateData[]) => {
@@ -379,8 +435,10 @@ export default function CalendarScreen() {
       const d = new Date(first.year, first.month - 1);
       setHeaderMonth(d.toLocaleString('default', { month: 'long', year: 'numeric' }));
       dayCellLayouts.current.clear();
+      // Fetch events for the newly visible month
+      fetchEventsForMonth(first.year, first.month);
     }
-  }, []);
+  }, [fetchEventsForMonth]);
 
   /** User confirmed a month/year in the picker */
   const handlePickerSelect = useCallback((month: number, year: number) => {
@@ -428,29 +486,45 @@ export default function CalendarScreen() {
           showScrollIndicator={false}
         />
 
-        {/* ── Events section (9.3.3 / 9.3.4) ── */}
-        <View style={styles.eventsSection}>
-          <View style={styles.eventsHeader}>
-            <Text style={styles.eventsTitle}>
-              {t('calendar.events', { date: selectedDate })}
-            </Text>
-            <Pressable
-              style={styles.addEventFab}
-              onPress={() => setAddEventModalVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={t('calendar.addEvent')}
-            >
-              <Text style={styles.addEventFabText}>+</Text>
-            </Pressable>
-          </View>
+        {/* ── Add Event FAB (6.3) ── */}
+        <Pressable
+          style={styles.addEventFab}
+          onPress={() => setAddEventModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('calendar.addEvent')}
+        >
+          <Text style={styles.addEventFabText}>+</Text>
+        </Pressable>
+      </View>
 
-          {events.length === 0 ? (
-            <Text style={styles.noEventsText}>{t('calendar.noEvents')}</Text>
-          ) : (
-            <FlatList
-              data={events}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
+      {/* ── Bottom Sheet Agenda (6.3) ── */}
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backgroundStyle={styles.bottomSheetBackground}
+        handleIndicatorStyle={styles.bottomSheetHandle}
+      >
+        <View style={styles.bottomSheetHeader}>
+          <Text style={styles.bottomSheetTitle}>
+            {t('calendar.events', { date: selectedDate })}
+          </Text>
+        </View>
+        {(() => {
+          const dayEvents = monthEvents.get(selectedDate);
+          const sorted = dayEvents ? sortEventsChronologically(dayEvents) : [];
+          if (sorted.length === 0) {
+            return (
+              <Text style={styles.noEventsText}>{t('calendar.noEvents')}</Text>
+            );
+          }
+          return (
+            <BottomSheetFlatList
+              data={sorted}
+              keyExtractor={(item: CalendarEvent) => item.id}
+              contentContainerStyle={styles.bottomSheetList}
+              renderItem={({ item }: { item: CalendarEvent }) => (
                 <Pressable
                   style={styles.eventRow}
                   onLongPress={() => handleDeleteEvent(item.id, item.title)}
@@ -464,9 +538,9 @@ export default function CalendarScreen() {
                 </Pressable>
               )}
             />
-          )}
-        </View>
-      </View>
+          );
+        })()}
+      </BottomSheet>
 
       <StickerDrawer
         visible={drawerVisible}
@@ -583,29 +657,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF7F50',
     marginTop: 1,
   },
-  eventsSection: {
+  eventDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#FF7F50',
+    marginTop: 1,
+  },
+  bottomSheetBackground: {
+    backgroundColor: '#1E1E1E',
+  },
+  bottomSheetHandle: {
+    backgroundColor: '#555555',
+  },
+  bottomSheetHeader: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    flex: 1,
+    paddingBottom: 8,
   },
-  eventsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  eventsTitle: {
+  bottomSheetTitle: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
+  bottomSheetList: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
   addEventFab: {
+    position: 'absolute',
+    bottom: 44,
+    right: 16,
     width: 30,
     height: 30,
     borderRadius: 15,
     backgroundColor: '#FF7F50',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   addEventFabText: {
     color: '#FFFFFF',
