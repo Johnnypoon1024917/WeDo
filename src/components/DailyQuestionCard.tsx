@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { getDailyQuestion, Prompt } from '../services/dailyQuestionService';
 import { markDiscussed } from '../services/streakService';
 import { feedPet } from '../services/petService';
+import { incrementFood } from '../services/inventoryFoodService';
 
 interface DailyQuestionCardProps {
   relationshipId: string;
@@ -56,6 +57,7 @@ export default function DailyQuestionCard({
       await markDiscussed(relationshipId, userId);
       setDiscussed(true);
       feedPet(relationshipId, 20, 20).catch(() => {});
+      incrementFood(relationshipId, 1).catch(() => {});
     } catch {
       // Silently fail — streak service handles retries internally
     } finally {

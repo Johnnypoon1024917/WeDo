@@ -37,6 +37,10 @@ interface AppStore {
   petTotalXp: number;
   petLastFedAt: string | null;
   setPetState: (state: PetState) => void;
+
+  // Food inventory
+  inventoryFood: number;
+  setInventoryFood: (value: number) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -85,6 +89,10 @@ export const useAppStore = create<AppStore>((set) => ({
       petTotalXp: state.petTotalXp,
       petLastFedAt: state.petLastFedAt,
     }),
+
+  // Food inventory
+  inventoryFood: 0,
+  setInventoryFood: (value) => set({ inventoryFood: value }),
 }));
 
 export type { AppStore };

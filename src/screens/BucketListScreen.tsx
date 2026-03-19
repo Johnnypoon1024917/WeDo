@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import { feedPet } from '../services/petService';
+import { incrementFood } from '../services/inventoryFoodService';
 import {
   realtimeManager,
   BucketListItem,
@@ -229,6 +230,7 @@ export default function BucketListScreen() {
       if (newCompleted) {
         if (relationshipId) {
           feedPet(relationshipId, 20, 20).catch(() => {});
+          incrementFood(relationshipId, 3).catch(() => {});
         }
         setCompletingItemId(item.id);
         setShowLottie(true);

@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import { compress } from '../services/imageCompressor';
 import { feedPet } from '../services/petService';
+import { incrementFood } from '../services/inventoryFoodService';
 import * as Crypto from 'expo-crypto';
 
 const MAX_CAPTION = 500;
@@ -141,6 +142,7 @@ export default function MemoryCreationModal({
       // 6. Feed the relationship pet (fire-and-forget)
       if (relationshipId) {
         feedPet(relationshipId, 20, 20).catch(() => {});
+        incrementFood(relationshipId, 2).catch(() => {});
       }
 
       // 7. Success — reset and close

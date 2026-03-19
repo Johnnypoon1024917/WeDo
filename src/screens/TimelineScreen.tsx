@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   FlatList,
   LayoutChangeEvent,
   Pressable,
@@ -33,9 +34,15 @@ import AudioRecorder from '../components/AudioRecorder';
 import AnniversaryBanner from '../components/AnniversaryBanner';
 import RelationshipPet from '../components/RelationshipPet';
 import SkeletonCard from '../components/SkeletonCard';
-import { loadAndDecayPet, feedPet, type Pet, fetchPetsForRelationship, assignPets } from '../services/petService';
-import LinkedCompanions from '../components/LinkedCompanions';
+import { loadAndDecayPet, feedPet, getEvolutionStage, type Pet, fetchPetsForRelationship, assignPets } from '../services/petService';
+import { fetchFoodInventory, decrementFood } from '../services/inventoryFoodService';
+import GardenBackground from '../components/GardenBackground';
+import GardenPetLayer from '../components/GardenPetLayer';
+import PlacedFoodBowl from '../components/PlacedFoodBowl';
+import FoodBowlOverlay from '../components/FoodBowlOverlay';
+import type { GroundBounds } from '../hooks/useRoamingEngine';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import LottieView from 'lottie-react-native';
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -296,8 +303,11 @@ function EmptyState() {
   return (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyEmoji}>📸</Text>
-      <Text style={styles.emptyText}>
+      <Text style={styles.emptyTitle}>
         {t('timeline.noAdventures')}
+      </Text>
+      <Text style={styles.emptySubtext}>
+        Complete a date from your Bucket List to create your first memory
       </Text>
     </View>
   );
@@ -333,10 +343,22 @@ export default function TimelineScreen() {
   const petTotalXp = useAppStore((s) => s.petTotalXp);
   const petLastFedAt = useAppStore((s) => s.petLastFedAt);
   const setPetState = useAppStore((s) => s.setPetState);
+  const inventoryFood = useAppStore((s) => s.inventoryFood);
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [foodPosition, setFoodPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showHappyBurst, setShowHappyBurst] = useState(false);
+  const [burstPosition, setBurstPosition] = useState<{ x: number; y: number } | null>(null);
   const memoriesRef = useRef<MemoryEntry[]>([]);
+
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const groundBounds: GroundBounds = {
+    top: screenHeight * 0.6,
+    bottom: screenHeight,
+    left: screenWidth * 0.1,
+    right: screenWidth * 0.9,
+  };
   const currentUserId = useAppStore((s) => s.user?.id) ?? '';
 
   // Keep ref in sync for realtime callbacks
@@ -353,6 +375,16 @@ export default function TimelineScreen() {
         // Silently ignore — pet UI simply won't render
       });
   }, [relationshipId, setPetState]);
+
+  /* ── hydrate food inventory ── */
+  useEffect(() => {
+    if (!relationshipId) return;
+    fetchFoodInventory(relationshipId)
+      .then((count) => useAppStore.getState().setInventoryFood(count))
+      .catch(() => {
+        // Default to 0 on failure
+      });
+  }, [relationshipId]);
 
   /* ── initial fetch ── */
   useEffect(() => {
@@ -424,6 +456,49 @@ export default function TimelineScreen() {
     setMemories((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
+  /* ── food placement handler ── */
+  const handleFoodPlaced = useCallback(async (x: number, y: number) => {
+    if (!relationshipId) return;
+    try {
+      await decrementFood(relationshipId, 1);
+      setFoodPosition({ x, y });
+    } catch {
+      // Failed to decrement — don't place food
+    }
+  }, [relationshipId]);
+
+  /* ── eating complete handler ── */
+  const handleEatingComplete = useCallback(async () => {
+    if (!relationshipId) return;
+    const prevXp = useAppStore.getState().petTotalXp;
+    const prevStage = getEvolutionStage(prevXp);
+
+    // Save food position for burst animation before clearing
+    const lastFoodPos = foodPosition;
+
+    try {
+      await feedPet(relationshipId, 0, 10); // 0 health boost, 10 XP
+    } catch {
+      // Silently ignore
+    }
+
+    const newXp = useAppStore.getState().petTotalXp;
+    const newStage = getEvolutionStage(newXp);
+
+    // Show Lottie happy burst at food location
+    if (lastFoodPos) {
+      setBurstPosition(lastFoodPos);
+      setShowHappyBurst(true);
+    }
+
+    if (newStage !== prevStage) {
+      // Evolution stage crossed — celebrate with haptic
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+
+    setFoodPosition(null);
+  }, [relationshipId, foodPosition]);
+
   const renderItem = useCallback(({ item }: { item: Row }) => {
     if (item.type === 'header') {
       return <DateHeader date={item.date} />;
@@ -449,6 +524,26 @@ export default function TimelineScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Z-layer 1-2: Sky gradient + Ground SVG */}
+      <GardenBackground />
+
+      {/* Z-layer 3: Pet avatars */}
+      <GardenPetLayer
+        myPet={myPet}
+        partnerPet={partnerPet}
+        groundBounds={groundBounds}
+        foodPosition={foodPosition}
+        onEatingComplete={handleEatingComplete}
+      />
+
+      {/* Z-layer 4: Placed food bowl */}
+      <PlacedFoodBowl
+        x={foodPosition?.x ?? 0}
+        y={foodPosition?.y ?? 0}
+        visible={foodPosition !== null}
+      />
+
+      {/* Z-layer 5: Timeline FlatList (transparent bg) */}
       <FlatList
         data={rows}
         renderItem={renderItem}
@@ -456,6 +551,7 @@ export default function TimelineScreen() {
         contentContainerStyle={
           rows.length === 0 ? styles.emptyList : styles.listContent
         }
+        style={{ backgroundColor: 'transparent' }}
         ListHeaderComponent={
           <>
             {petName != null && petLastFedAt != null && (
@@ -469,18 +565,40 @@ export default function TimelineScreen() {
               />
             )}
             <AnniversaryBanner />
-            {pets.length > 0 && relationshipId && (
-              <LinkedCompanions
-                myPet={myPet}
-                partnerPet={partnerPet}
-                relationshipId={relationshipId}
-              />
-            )}
           </>
         }
         ListEmptyComponent={EmptyState}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Z-layer 6: Food Bowl overlay (topmost) */}
+      <FoodBowlOverlay
+        inventoryFood={inventoryFood}
+        groundBounds={groundBounds}
+        onFoodPlaced={handleFoodPlaced}
+      />
+
+      {/* Lottie happy burst animation */}
+      {showHappyBurst && burstPosition && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.lottieContainer,
+            { left: burstPosition.x - 75, top: burstPosition.y - 75 },
+          ]}
+        >
+          <LottieView
+            source={require('../../assets/animations/pet-baby-happy.json')}
+            autoPlay
+            loop={false}
+            onAnimationFinish={() => {
+              setShowHappyBurst(false);
+              setBurstPosition(null);
+            }}
+            style={styles.lottieBurst}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -499,9 +617,9 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
   },
 
   /* date header */
@@ -595,17 +713,38 @@ const styles = StyleSheet.create({
   /* empty state */
   emptyContainer: {
     alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
   },
   emptyEmoji: {
     fontSize: 64,
     marginBottom: 16,
   },
-  emptyText: {
-    fontFamily: 'Nunito_400Regular',
-    fontSize: 16,
-    color: '#6B6B6B',
+  emptyTitle: {
+    fontFamily: 'PlayfairDisplay_700Bold',
+    fontSize: 18,
+    color: '#4A4A4A',
     textAlign: 'center',
-    lineHeight: 24,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontFamily: 'Nunito_400Regular',
+    fontSize: 14,
+    color: '#8B8B8B',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  /* lottie burst */
+  lottieContainer: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    zIndex: 200,
+  },
+  lottieBurst: {
+    width: 150,
+    height: 150,
   },
 
 });
