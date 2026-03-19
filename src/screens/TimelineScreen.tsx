@@ -33,7 +33,8 @@ import AudioRecorder from '../components/AudioRecorder';
 import AnniversaryBanner from '../components/AnniversaryBanner';
 import RelationshipPet from '../components/RelationshipPet';
 import SkeletonCard from '../components/SkeletonCard';
-import { loadAndDecayPet, feedPet } from '../services/petService';
+import { loadAndDecayPet, feedPet, type Pet, fetchPetsForRelationship, assignPets } from '../services/petService';
+import LinkedCompanions from '../components/LinkedCompanions';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -333,8 +334,10 @@ export default function TimelineScreen() {
   const petLastFedAt = useAppStore((s) => s.petLastFedAt);
   const setPetState = useAppStore((s) => s.setPetState);
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
+  const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
   const memoriesRef = useRef<MemoryEntry[]>([]);
+  const currentUserId = useAppStore((s) => s.user?.id) ?? '';
 
   // Keep ref in sync for realtime callbacks
   useEffect(() => {
@@ -368,6 +371,14 @@ export default function TimelineScreen() {
       if (!error && data) {
         setMemories(data as MemoryEntry[]);
       }
+
+      try {
+        const fetchedPets = await fetchPetsForRelationship(relationshipId);
+        setPets(fetchedPets);
+      } catch {
+        // Silently ignore — LinkedCompanions simply won't render
+      }
+
       setLoading(false);
     })();
   }, [relationshipId]);
@@ -406,6 +417,7 @@ export default function TimelineScreen() {
   }, [relationshipId]);
 
   /* ── render ── */
+  const { myPet, partnerPet } = assignPets(pets, currentUserId);
   const rows = buildRows(memories);
 
   const handleDeleteMemory = useCallback((id: string) => {
@@ -457,6 +469,13 @@ export default function TimelineScreen() {
               />
             )}
             <AnniversaryBanner />
+            {pets.length > 0 && relationshipId && (
+              <LinkedCompanions
+                myPet={myPet}
+                partnerPet={partnerPet}
+                relationshipId={relationshipId}
+              />
+            )}
           </>
         }
         ListEmptyComponent={EmptyState}
